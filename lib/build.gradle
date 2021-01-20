@@ -55,7 +55,9 @@ repositories {
     maven {
         url 'http://maven.aliyun.com/nexus/content/repositories/jcenter'
     }
+    jcenter()
     mavenCentral()
     google()
-    jcenter()
 }
+
+apply from: 'publish.gradle'
