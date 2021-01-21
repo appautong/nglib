@@ -12,19 +12,19 @@ task androidSourcesJar(type: Jar) {
 publishing {
     publications {
         Production(MavenPublication) {
-            artifact("$buildDir/outputs/aar/lib-release.aar")
             groupId 'cc.appauto.nglib'
             artifactId 'lib'
             version this.version
 
+            artifact("$buildDir/outputs/aar/lib-release.aar")
             artifact androidSourcesJar
 
             pom.withXml {
-                def dependenciesNode = asNode().appendNode('dependencies')
+                def dependenciesNode = asNode().getAt('dependencies')[0] ?: asNode().appendNode('dependencies')
 
                 // Iterate over the implementation dependencies (we don't want the test ones), adding a <dependency> node for each
                 configurations.implementation.allDependencies.each {
-                    // Ensure dependencies such as fileTree are not included in the pom.
+                    // Ensure dependencies such as fileTree are not included.
                     if (it.name != 'unspecified') {
                         def dependencyNode = dependenciesNode.appendNode('dependency')
                         dependencyNode.appendNode('groupId', it.group)
@@ -41,7 +41,6 @@ bintray {
     user = project.hasProperty('bintrayUser') ?: System.getenv('BINTRAY_USER')
     key = project.hasProperty('bintrayApiKey') ?: System.getenv('BINTRAY_API_KEY')
     publications = ['Production']
-    configurations = ['archives']
     override = true
     pkg {
         userOrg = 'appautong'

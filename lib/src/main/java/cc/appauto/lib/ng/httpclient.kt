@@ -72,7 +72,7 @@ object HttpClient {
             val data = future.get(timeoutSec, TimeUnit.SECONDS)
             ret["result"] = data
         } catch (e: Exception) {
-            ret["error"] = "get leads to exception: ${Log.getStackTraceString(e)}"
+            ret["error"] = "post leads to exception: ${Log.getStackTraceString(e)}"
             Log.e(TAG, ret.getString("error"))
         }
         return ret
