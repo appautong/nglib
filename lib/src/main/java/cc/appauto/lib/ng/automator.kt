@@ -9,7 +9,7 @@ class AutomationStep(val name: String, val automator: AppAutomator) {
     private var exp: ((HierarchyTree, AutomationStep) -> Boolean)? = null
     private var retryCount: Int = AppAutomator.defaultRetryCount
 
-    private var executed: Int = 0
+    private var actionExecuted: Int = 0
     var expectedSuccess: Boolean = false
         private set
 
@@ -37,33 +37,51 @@ class AutomationStep(val name: String, val automator: AppAutomator) {
         return this
     }
 
+    private fun executeAction() {
+        this.act!!(this)
+        actionExecuted++
+        if (postActDelay > 0) sleep(postActDelay)
+    }
+
     // start the action-expect loop
     fun run(): Boolean {
         if (act == null) {
             message = "nil action"
             return false
         }
+        if (exp == null) {
+            // set expectation result to true if no expect runnable
+            expectedSuccess = true
+            message = "no expectation, set step succeed"
+            return expectedSuccess
+        }
         do {
-            executed++
-            this.act!!(this)
-            if (postActDelay > 0) sleep(postActDelay)
-            if (exp == null) {
-                // set expection result to true if no expect runnable
-                expectedSuccess = true
-                message = "no expection, set step successed"
-                break
-            } else {
-                val tree = HierarchyTree.from(automator.srv) ?: continue
-                val matched = this.exp!!(tree, this)
-                tree.recycle()
-                if (matched) {
-                    expectedSuccess = true
-                    message = "succeed in NO.$executed execution"
+            // execute the action and increase the executed count
+            this.executeAction()
+            val tree = HierarchyTree.from(automator.srv)
+            if (tree == null) {
+                message = "null hierarchy tree in NO.$actionExecuted execution"
+                if (actionExecuted < retryCount) {
+                    continue
+                } else {
                     break
                 }
             }
-        } while(executed <= retryCount)
-        if (executed > retryCount) message = "failed after tried $executed times"
+            val matched = this.exp!!(tree, this)
+            if (matched) {
+                expectedSuccess = true
+                message = "succeed in NO.$actionExecuted execution"
+                tree.recycle()
+                break
+            }
+
+            if (actionExecuted == retryCount) {
+                message = "failed after tried $actionExecuted times\ncontrols:\n${tree.hierarchyString}"
+                tree.recycle()
+                break
+            }
+            tree.recycle()
+        } while(true)
         return expectedSuccess
     }
 }
@@ -120,7 +138,7 @@ class AppAutomator(val srv: AccessibilityService) {
         step.retry(0).postActionDelay(0).action {
             quitApp(srv, packageName)
             openApp(srv, srv.applicationContext, packageName)
-        }.expect { tree, step ->
+        }.expect { tree, _ ->
             tree.packageName == packageName
         }
         steps.add(step)

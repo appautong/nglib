@@ -78,12 +78,13 @@ class HierarchyTree private constructor() {
     }
 
     protected fun finalize() {
-        Log.i(TAG, "finalize called for: ${this.windowId}")
+        Log.v(TAG, "finalize called for: ${this.windowId}")
         recycle()
     }
 
+    // no operation shall be done with this tree object afeter recycle
     fun recycle() {
-        Log.i(TAG, "recycle the hierarchy: ${this.windowId}")
+        Log.v(TAG, "recycle the hierarchy: ${this.windowId}")
         this.root = null
 
         val tmp = this.accessibilityNodes
@@ -106,6 +107,15 @@ class HierarchyTree private constructor() {
     }
 
     fun print() = this.root?.print()
+
+    val hierarchyString
+        get() = if (root == null)
+            "null root node"
+        else {
+            val sb = StringBuilder()
+            root!!.walk { sb.appendLine(it.string()) }
+            sb.toString()
+        }
 
     // mark the corresponded AccessibilityNodeInfo shall not be recycled by HierarchyTree.recycle
     fun markKept(vararg nodes: HierarchyNode) {
