@@ -6,15 +6,60 @@ import android.os.Handler
 import android.os.HandlerThread
 import android.util.Log
 import android.view.accessibility.AccessibilityManager
+import org.mozilla.javascript.Script
 import java.security.InvalidParameterException
 
-class AppAutoContext private constructor(val name: String) {
-    private lateinit var appContext: Context
-    private lateinit var mgr: AccessibilityManager
-    private lateinit var workHandler: Handler
-    private lateinit var workThread: HandlerThread
+import org.mozilla.javascript.Context as JSContext
+import org.mozilla.javascript.ScriptableObject
 
-    private var accessibilityEnabled = false
+class AppAutoContext private constructor(val name: String, val ctx: Context) {
+    var workHandler: Handler
+        private set
+
+    var accessibilityEnabled: Boolean
+        private set
+
+    var jsContext: JSContext
+        private set
+
+    var jsGlobalScope: ScriptableObject
+        private set
+
+    val httpClient: HttpClient = HttpClient(ctx)
+
+    private var mgr: AccessibilityManager = ctx.getSystemService(Context.ACCESSIBILITY_SERVICE) as AccessibilityManager
+    private var workThread: HandlerThread = HandlerThread("${TAG}_${name}_thread")
+
+    init {
+        workThread.start()
+        workHandler = Handler(workThread.looper)
+        mgr.addAccessibilityStateChangeListener {
+            workHandler.postAtFrontOfQueue { onStateChange(it) }
+        }
+        accessibilityEnabled = mgr.isEnabled
+        Log.i(TAG, "$name: accessibilityEnabled: ${mgr.isEnabled}")
+
+        jsContext = JSContext.enter()
+        jsGlobalScope = jsContext.initStandardObjects(null, true)
+        jsContext.optimizationLevel = -1
+
+        Log.i(TAG, "$name: init the js context")
+    }
+
+    private var closed = false
+
+    @Synchronized
+    fun close() {
+        if (closed) return
+
+        closed = true
+        JSContext.exit()
+        httpClient.close()
+    }
+
+    protected fun finalize() {
+       close()
+    }
 
     companion object {
         private val contexts: MutableMap<String, AppAutoContext> = mutableMapOf()
@@ -28,20 +73,9 @@ class AppAutoContext private constructor(val name: String) {
         }
 
         @Synchronized
-        fun init(ctx: Context, name: String = DEFAULT_CONTEXT_NAME): AppAutoContext {
+        fun of(ctx: Context, name: String = DEFAULT_CONTEXT_NAME): AppAutoContext {
             if (contexts.containsKey(name)) throw InvalidParameterException("app context with name <$name> is already existed")
-            val obj = AppAutoContext(name)
-            obj.appContext = ctx
-            obj.mgr = ctx.getSystemService(Context.ACCESSIBILITY_SERVICE) as AccessibilityManager
-            obj.workThread = HandlerThread("${TAG}_${obj.name}_thread")
-            obj.workThread.start()
-            obj.workHandler = Handler(obj.workThread.looper)
-
-            obj.mgr.addAccessibilityStateChangeListener {
-                obj.workHandler.postAtFrontOfQueue { obj.onStateChange(it) }
-            }
-            obj.accessibilityEnabled = obj.mgr.isEnabled
-            Log.i(TAG, "$name: accessibilityEnabled: ${obj.mgr.isEnabled}")
+            val obj = AppAutoContext(name, ctx)
 
             contexts[obj.name] = obj
             return obj
@@ -50,7 +84,7 @@ class AppAutoContext private constructor(val name: String) {
 
     private fun onStateChange(enabled: Boolean) {
         Log.i(TAG, "$name: accessibility service state changed to $enabled")
-        this.accessibilityEnabled =  enabled
+        this.accessibilityEnabled = enabled
     }
 
     // dump the top app node resurively in appauto context's work thread

@@ -10,34 +10,22 @@ import com.android.volley.toolbox.StringRequest
 import com.android.volley.toolbox.Volley
 import java.util.concurrent.TimeUnit
 
-object HttpClient {
-    private lateinit  var ctx: Context
-    private lateinit  var queue: RequestQueue
-    private var inited = false
+class HttpClient(val ctx: Context) {
+    private var queue: RequestQueue = Volley.newRequestQueue(this.ctx)
 
-    @Synchronized
-    fun init(ctx: Context) {
-        if (inited) return
-
-        this.ctx = ctx
-        queue = Volley.newRequestQueue(ctx.applicationContext)
-        inited = true
+    fun close() {
+        queue.stop()
     }
-
     fun get(url: String, timeoutSec: Long = 10) : JSONObject {
         val ret = JSONObject()
-        if (!inited) {
-            ret["error"] = "HttpClient is not initialized, please invoke init first"
-            return ret
-        }
         val future = RequestFuture.newFuture<String>()
         val req = object: StringRequest(Method.GET, url, future, future) {
             override fun getPriority(): Priority {
                 return Priority.IMMEDIATE
             }
         }
-        queue.add(req)
         try {
+            queue.add(req)
             val data = future.get(timeoutSec, TimeUnit.SECONDS)
             ret["result"] = data
         } catch (e: Exception) {
@@ -49,10 +37,6 @@ object HttpClient {
 
     fun post(url: String, body: JSON, timeoutSec: Long = 10): JSONObject {
         val ret = JSONObject()
-        if (!inited) {
-            ret["error"] = "HttpClient is not initialized, please invoke init first"
-            return ret
-        }
         val future = RequestFuture.newFuture<String>()
         val req = object: StringRequest(Method.POST, url, future, future) {
             override fun getPriority(): Priority {
@@ -67,8 +51,8 @@ object HttpClient {
                 return JSON.toJSONBytes(body)
             }
         }
-        queue.add(req)
         try {
+            queue.add(req)
             val data = future.get(timeoutSec, TimeUnit.SECONDS)
             ret["result"] = data
         } catch (e: Exception) {
