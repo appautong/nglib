@@ -40,6 +40,8 @@ class AppAutoContext private constructor(val name: String, val ctx: Context) {
         Log.i(TAG, "$name: accessibilityEnabled: ${mgr.isEnabled}")
 
         jsContext = JSContext.enter()
+
+        // make all Packages in global scope sealed
         jsGlobalScope = jsContext.initStandardObjects(null, true)
         jsContext.optimizationLevel = -1
 
