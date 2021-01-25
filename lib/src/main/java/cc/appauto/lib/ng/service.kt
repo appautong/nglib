@@ -11,6 +11,12 @@ import android.view.WindowManager
 import android.view.accessibility.AccessibilityNodeInfo
 import android.view.accessibility.AccessibilityWindowInfo
 
+fun AccessibilityService?.getHierarchyString(): String {
+    if (this == null) return "null accessibility service"
+    val tree = HierarchyTree.from(this) ?: return "null returned by getTopAppNode in HierarchyTree.from"
+    return tree.hierarchyString
+}
+
 fun AccessibilityService.doGesture(p: Path, start: Long, dur: Long) {
     if(this.serviceInfo.capabilities and AccessibilityServiceInfo.CAPABILITY_CAN_PERFORM_GESTURES == 0) {
         Log.e(TAG, "doGesture:require CAPABILITY_CAN_PERFORM_GESTURES")

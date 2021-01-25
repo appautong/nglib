@@ -6,17 +6,20 @@ import android.os.Handler
 import android.os.HandlerThread
 import android.util.Log
 import android.view.accessibility.AccessibilityManager
-import org.mozilla.javascript.Script
 import java.security.InvalidParameterException
 
 import org.mozilla.javascript.Context as JSContext
 import org.mozilla.javascript.ScriptableObject
 
-class AppAutoContext private constructor(val name: String, val ctx: Context) {
+class AppAutoContext private constructor(val name: String, val appContext: Context) {
     var workHandler: Handler
         private set
 
+    var srv: AccessibilityService? = null
+
     var accessibilityEnabled: Boolean
+        get() = if (srv == null) false
+        else field
         private set
 
     var jsContext: JSContext
@@ -25,9 +28,9 @@ class AppAutoContext private constructor(val name: String, val ctx: Context) {
     var jsGlobalScope: ScriptableObject
         private set
 
-    val httpClient: HttpClient = HttpClient(ctx)
+    val httpClient: HttpClient = HttpClient(appContext)
 
-    private var mgr: AccessibilityManager = ctx.getSystemService(Context.ACCESSIBILITY_SERVICE) as AccessibilityManager
+    private var mgr: AccessibilityManager = appContext.getSystemService(Context.ACCESSIBILITY_SERVICE) as AccessibilityManager
     private var workThread: HandlerThread = HandlerThread("${TAG}_${name}_thread")
 
     init {
@@ -92,12 +95,19 @@ class AppAutoContext private constructor(val name: String, val ctx: Context) {
     // dump the top app node resurively in appauto context's work thread
     fun dumpTopActiveApp(srv: AccessibilityService) {
         this.workHandler.post {
-            val top = getTopAppNode(srv) ?: return@post
-            val ht = HierarchyTree.from(top)
+            val ht = HierarchyTree.from(srv) ?: return@post
             ht.print()
             ht.recycle()
         }
     }
+
+    val topAppHierarchyString: String
+        get() {
+            if (!accessibilityEnabled) {
+                return "accessibility not enabled"
+            }
+            return srv.getHierarchyString()
+        }
 
     // run the work in appauto context's work thread
     fun runWork(r: Runnable) {
