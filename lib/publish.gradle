@@ -1,8 +1,7 @@
 apply plugin: 'maven-publish'
 apply plugin: 'com.jfrog.bintray'
 
-version '1.0.0'
-group 'com.bintray'
+version '1.0.1-SNAPSHOT'
 
 task androidSourcesJar(type: Jar) {
     from android.sourceSets.main.java.srcDirs
@@ -17,10 +16,13 @@ publishing {
             version this.version
 
             artifact("$buildDir/outputs/aar/lib-release.aar")
+            /*
             artifact("$buildDir/intermediates/aar_main_jar/release/classes.jar") {
                 classifier = 'sources'
             }
-            // artifact androidSourcesJar
+            */
+
+            artifact androidSourcesJar
 
             pom.withXml {
                 def dependenciesNode = asNode().getAt('dependencies')[0] ?: asNode().appendNode('dependencies')
@@ -36,6 +38,11 @@ publishing {
                     }
                 }
             }
+        }
+    }
+    repositories {
+        maven {
+            url("file://"+project.rootDir.absolutePath+"/repository")
         }
     }
 }

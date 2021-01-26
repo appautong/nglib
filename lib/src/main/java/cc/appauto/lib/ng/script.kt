@@ -1,6 +1,9 @@
 package cc.appauto.lib.ng
 
 import android.util.Log
+import cc.appauto.lib.ng.AppAutoContext.Companion.httpClient
+import cc.appauto.lib.ng.AppAutoContext.Companion.jsContext
+import cc.appauto.lib.ng.AppAutoContext.Companion.jsGlobalScope
 import com.alibaba.fastjson.JSONObject
 import org.mozilla.javascript.Context
 import java.io.File
@@ -23,7 +26,7 @@ fun AppAutoContext.executeScript(url: String?): JSONObject {
         ret["error"] = "null or empty url passed"
         return ret
     }
-    ret = this.httpClient.get(url)
+    ret = httpClient.get(url)
     if (ret.containsKey("error")) return ret
 
     val data = ret.getString("result")
@@ -39,7 +42,5 @@ private fun AppAutoContext.execute(src: String): JSONObject {
         ret["error"] = "execute script leads to exception: ${Log.getStackTraceString(e)}"
         Log.e(TAG, ret.getString("error"))
     }
-
-    Context.exit()
     return ret
 }
