@@ -32,7 +32,7 @@ fun AccessibilityNodeInfo.click(srv: AccessibilityService?) {
         return
     }
     val r = this.bound()
-    srv.click(r.centerX(), r.centerY(), 0, 10)
+    srv.click(r.centerX(), r.centerY())
 }
 
 // pass null/empty text to clear current text

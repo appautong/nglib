@@ -19,13 +19,12 @@ fun AccessibilityService?.getHierarchyString(): String {
     return tree.hierarchyString
 }
 
-fun AccessibilityService.doGesture(p: Path, start: Long, dur: Long) {
+// check gesture capability first then dispatch builder.build()
+private fun AccessibilityService.doGesture(builder: GestureDescription.Builder) {
     if(this.serviceInfo.capabilities and AccessibilityServiceInfo.CAPABILITY_CAN_PERFORM_GESTURES == 0) {
         Log.e(TAG, "doGesture:require CAPABILITY_CAN_PERFORM_GESTURES")
         return
     }
-    val builder = GestureDescription.Builder()
-    builder.addStroke(GestureDescription.StrokeDescription(p, start, dur))
     this.dispatchGesture(builder.build(), null, null)
 }
 
@@ -35,7 +34,10 @@ fun AccessibilityService.scroll(xFrom: Int, yFrom: Int, xTo: Int, yTo: Int, star
     path.moveTo(xFrom.toFloat(), yFrom.toFloat())
     path.lineTo(xTo.toFloat(), yTo.toFloat())
     Log.v(TAG, "scroll: stroke path from ($xFrom, $yFrom) to ($xTo, $yTo)")
-    this.doGesture(path, start, dur)
+    val builder = GestureDescription.Builder()
+    builder.addStroke(GestureDescription.StrokeDescription(path, start, dur))
+
+    this.doGesture(builder)
 }
 
 // scroll duration shall not less than 40ms, as it will accelerate the scroll process hugely
@@ -54,6 +56,7 @@ fun AccessibilityService.scrollUpDown(isUp: Boolean, screenPercent: Float, durat
     if (screenPercent > 1) {
         percent = 1f
     }
+
     val wm = this.getSystemService(Context.WINDOW_SERVICE) as WindowManager
     var p = Point()
     wm.defaultDisplay.getSize(p)
@@ -94,11 +97,16 @@ fun AccessibilityService.setTouchMode(enable: Boolean) {
     getTopAppNode(this)?.recycle()
 }
 
-fun AccessibilityService.click(x: Int, y: Int, start: Long, dur: Long) {
+fun AccessibilityService.click(x: Int, y: Int, times: Int = 1) {
     val path = Path()
     path.moveTo(x.toFloat(), y.toFloat())
-    Log.v(TAG, "click point of ($x, $y)")
-    this.doGesture(path, start, dur)
+    Log.v(TAG, "click point of ($x, $y) $times times")
+    val builder = GestureDescription.Builder()
+
+    for (i in 0 until times) {
+        builder.addStroke(GestureDescription.StrokeDescription(path, (i*200).toLong(), 100))
+    }
+    this.doGesture(builder)
 }
 
 fun getTopAppNode(srv: AccessibilityService?, packageName: String? = null): AccessibilityNodeInfo? {
