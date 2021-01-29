@@ -4,9 +4,10 @@ import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.AccessibilityServiceInfo
 import android.accessibilityservice.GestureDescription
 import android.content.Context
-import android.content.Intent
 import android.graphics.Path
 import android.graphics.Point
+import android.service.notification.NotificationListenerService
+import android.service.notification.StatusBarNotification
 import android.util.Log
 import android.view.WindowManager
 import android.view.accessibility.AccessibilityEvent
@@ -153,5 +154,67 @@ fun getInputIMEWindow(srv: AccessibilityService?) : AccessibilityWindowInfo? {
     } catch (e: Exception) {
         Log.e(TAG, "getInputIMEWindow: ${Log.getStackTraceString(e)}")
         null
+    }
+}
+
+class AppAutoService: AccessibilityService() {
+    private val name = "appauto_service"
+    override fun onCreate() {
+        super.onCreate()
+
+        AppAutoContext.autoSrv = this
+        AppAutoContext.initAppContext(this)
+        Log.i(TAG, "$name: onCreate ${System.identityHashCode(this)}")
+    }
+
+    override fun onAccessibilityEvent(event: AccessibilityEvent?) {
+    }
+
+    override fun onInterrupt() {
+    }
+
+    override fun onDestroy() {
+        Log.i(TAG, "$name: onDestroy ${System.identityHashCode(this)}")
+        AppAutoContext.accessibilityConnected = false
+        AppAutoContext.autoSrv = null
+    }
+
+    override fun onServiceConnected() {
+        super.onServiceConnected()
+        Log.i(TAG, "$name: onServiceConnected")
+        AppAutoContext.accessibilityConnected = true
+    }
+}
+
+class AppAutoNotificationService: NotificationListenerService() {
+    private val name = "appauto_noti_service"
+
+    override fun onCreate() {
+        super.onCreate()
+
+        AppAutoContext.notiSrv = this
+        AppAutoContext.initAppContext(this)
+        Log.i(TAG, "$name: onCreate ${System.identityHashCode(this)}")
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+
+        AppAutoContext.notiSrv = null
+        AppAutoContext.listenerConnected = false
+        Log.i(TAG, "$name: onDestroy ${System.identityHashCode(this)}")
+    }
+
+    override fun onNotificationPosted(sbn: StatusBarNotification?) {
+    }
+
+    override fun onListenerConnected() {
+        Log.i(TAG, "$name: on listener connected ${System.identityHashCode(this)}")
+        AppAutoContext.listenerConnected = true
+    }
+
+    override fun onListenerDisconnected() {
+        Log.i(TAG, "$name: on listener disconnected ${System.identityHashCode(this)}")
+        AppAutoContext.listenerConnected = false
     }
 }

@@ -1,9 +1,6 @@
 package cc.appauto.lib.ng
 
 import android.util.Log
-import cc.appauto.lib.ng.AppAutoContext.Companion.httpClient
-import cc.appauto.lib.ng.AppAutoContext.Companion.jsContext
-import cc.appauto.lib.ng.AppAutoContext.Companion.jsGlobalScope
 import com.alibaba.fastjson.JSONObject
 import org.mozilla.javascript.Context
 import java.io.File

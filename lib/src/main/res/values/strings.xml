@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">appauto service</string>
+    <string name="appauto_service_name">autong service</string>
+    <string name="appauto_noti_service_name">autong notification service</string>
 </resources>
