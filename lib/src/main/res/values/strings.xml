@@ -2,4 +2,7 @@
 <resources>
     <string name="appauto_service_name">autong service</string>
     <string name="appauto_noti_service_name">autong notification service</string>
+    <string name="autodraw_image_desc">appauto draw area</string>
+    <string name="appauto_require_permission">require permission</string>
+    <string name="appauto_require_overlay_permission">draw on overlay permission is required</string>
 </resources>

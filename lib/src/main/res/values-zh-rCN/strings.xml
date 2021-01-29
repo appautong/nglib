@@ -2,4 +2,7 @@
 <resources>
     <string name="appauto_service_name">autong辅助服务</string>
     <string name="appauto_noti_service_name">autong通知服务</string>
+    <string name="autodraw_image_desc">autong绘图区域</string>
+    <string name="appauto_require_permission">获取权限</string>
+    <string name="appauto_require_overlay_permission">需要overlay绘图权限</string>
 </resources>
