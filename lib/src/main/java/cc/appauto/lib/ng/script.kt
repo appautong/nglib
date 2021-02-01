@@ -8,7 +8,7 @@ import java.io.File
 fun AppAutoContext.executeScript(f: File): JSONObject {
     return try {
         val src = f.readText()
-        execute(src)
+        executeScript(src)
     } catch (e: Exception) {
         val ret = JSONObject()
         ret["error"] = "executeScript leads to exception: ${Log.getStackTraceString(e)}"
@@ -27,17 +27,5 @@ fun AppAutoContext.executeScript(url: String?): JSONObject {
     if (ret.containsKey("error")) return ret
 
     val data = ret.getString("result")
-    return execute(data)
-}
-
-private fun AppAutoContext.execute(src: String): JSONObject {
-    val ret = JSONObject()
-    try {
-        val obj = jsContext.evaluateString(jsGlobalScope, src, "<execute>", 0, null)
-        ret["result"] = Context.toString(obj)
-    } catch (e: Exception) {
-        ret["error"] = "execute script leads to exception: ${Log.getStackTraceString(e)}"
-        Log.e(TAG, ret.getString("error"))
-    }
-    return ret
+    return executeScript(data)
 }

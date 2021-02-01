@@ -17,13 +17,14 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.WindowManager
 import android.view.accessibility.AccessibilityManager
-import android.widget.ImageView
-import androidx.core.util.Pools
 import cc.appauto.lib.R
+import com.alibaba.fastjson.JSONObject
 import org.mozilla.javascript.ScriptableObject
+import java.util.concurrent.Executor
+import java.util.concurrent.FutureTask
 import org.mozilla.javascript.Context as JSContext
 
-object AppAutoContext {
+object AppAutoContext: Executor {
     private const val name = "autoctx"
 
     // current accessibility service and notification listener service
@@ -36,9 +37,6 @@ object AppAutoContext {
         internal set
     var listenerConnected: Boolean = false
         internal set
-
-    // android float view pools
-    internal val vPools: Pools.SynchronizedPool<ImageView> = Pools.SynchronizedPool(32)
 
     // android application context related
     lateinit var appContext: Context
@@ -71,7 +69,7 @@ object AppAutoContext {
         workHandler = Handler(workThread.looper)
 
         // initialize javascript context in work thread
-        workHandler.post {
+        runWork {
             jsContext = JSContext.enter()
             // make all Packages in global scope sealed
             jsGlobalScope = jsContext.initStandardObjects(null, true)
@@ -139,8 +137,8 @@ object AppAutoContext {
     // dump the top app node recursively in appauto context's work thread
     fun dumpTopActiveApp() {
         val s = autoSrv ?: return;
-        workHandler.post {
-            val ht = HierarchyTree.from(s) ?: return@post
+        runWork {
+            val ht = HierarchyTree.from(s) ?: return@runWork
             ht.print()
             ht.recycle()
         }
@@ -155,7 +153,7 @@ object AppAutoContext {
         }
 
     // run the work in appauto context's work thread
-    fun runWork(r: Runnable) {
+    internal fun runWork(r: Runnable) {
         workHandler.post(r)
     }
 
@@ -187,5 +185,42 @@ object AppAutoContext {
         builder.setPositiveButton(android.R.string.yes) { _, _ ->
             ctx.startActivity(intent)
         }.show()
+    }
+
+    private fun _executeScript(src: String): JSONObject {
+        val ret = JSONObject()
+        if (!appContextInited) {
+            val log = "executeScript: context is not initialized, please retry after accessibility service connected"
+            ret["error"] = log
+            Log.e(TAG, "$name: $log")
+            return ret
+        }
+        try {
+            val obj = jsContext.evaluateString(jsGlobalScope, src, "<execute>", -1, null)
+            ret["result"] = org.mozilla.javascript.Context.toString(obj)
+        } catch (e: Exception) {
+            ret["error"] = "execute script leads to exception: ${Log.getStackTraceString(e)}"
+            Log.e(TAG, ret.getString("error"))
+        }
+        return ret
+    }
+
+    // execute the javascript in the work thread
+    fun executeScript(src: String): JSONObject {
+        val tid = android.os.Process.myTid()
+        Log.i(TAG, "$name: executeScript, tid: $tid, work thread id: ${workThread.threadId}")
+        if (tid == workThread.threadId) {
+            return _executeScript(src)
+        }
+        val f = FutureTask {
+            _executeScript(src)
+        }
+        execute(f)
+
+        return f.get()
+    }
+
+    override fun execute(command: Runnable?) {
+        command?.let { runWork(command) }
     }
 }
