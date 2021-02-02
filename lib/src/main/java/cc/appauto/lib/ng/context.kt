@@ -46,10 +46,10 @@ object AppAutoContext: Executor {
     lateinit var httpClient: HttpClient
         private set
 
-    lateinit var jsContext: JSContext
+    internal lateinit var jsContext: JSContext
         private set
 
-    lateinit var jsGlobalScope: ScriptableObject
+    internal lateinit var jsGlobalScope: ScriptableObject
         private set
 
     var workHandler: Handler
@@ -196,7 +196,8 @@ object AppAutoContext: Executor {
             return ret
         }
         try {
-            val obj = jsContext.evaluateString(jsGlobalScope, src, "<execute>", -1, null)
+            val s = newScope(jsGlobalScope)
+            val obj = jsContext.evaluateString(s, src, "<execute>", -1, null)
             ret["result"] = org.mozilla.javascript.Context.toString(obj)
         } catch (e: Exception) {
             ret["error"] = "execute script leads to exception: ${Log.getStackTraceString(e)}"

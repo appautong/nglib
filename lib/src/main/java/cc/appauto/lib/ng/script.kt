@@ -3,6 +3,8 @@ package cc.appauto.lib.ng
 import android.util.Log
 import com.alibaba.fastjson.JSONObject
 import org.mozilla.javascript.Context
+import org.mozilla.javascript.Scriptable
+import org.mozilla.javascript.ScriptableObject
 import java.io.File
 
 fun AppAutoContext.executeScript(f: File): JSONObject {
@@ -28,4 +30,12 @@ fun AppAutoContext.executeScript(url: String?): JSONObject {
 
     val data = ret.getString("result")
     return executeScript(data)
+}
+
+// create a new scope based on given scope object
+internal fun AppAutoContext.newScope(scope: ScriptableObject): Scriptable {
+    val obj = jsContext.newObject(scope)
+    obj.parentScope = null
+    obj.prototype = scope
+    return obj
 }

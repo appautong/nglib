@@ -2,7 +2,9 @@ package cc.appauto.lib
 
 import org.junit.Test
 import org.mozilla.javascript.Context
+import org.mozilla.javascript.NativeObject
 import org.mozilla.javascript.ScriptableObject
+import org.mozilla.javascript.ast.Scope
 
 class rhionTest {
     @Test
@@ -26,10 +28,15 @@ class rhionTest {
     @Test
     fun testJsObject() {
         val ctx = Context.enter()
-        val scopeGlobal = ctx.initSafeStandardObjects(null, true)
-        val s = ctx.compileString("var obj = {k1: 1, k2:'123'};obj", "<cmd>", 1, null)
-        val obj = s.exec(ctx, scopeGlobal)
-        println("obj is: ${Context.toObject(obj, scopeGlobal).get("k3", null)}")
+        val scopeGlobal = ctx.initStandardObjects(null, true)
+        val scope2 = ctx.newObject(scopeGlobal)
+        scope2.prototype = scopeGlobal
+        scope2.parentScope = null
+
+
+        ctx.evaluateString(scope2, "var obj = {k1: 1, k2:'123'};obj", "<cmd>", 1, null)
+        println("obj is: ${scope2.get("obj", null)}")
+        println("obj is: ${scopeGlobal.get("obj", null)}")
         Context.exit()
     }
 }
