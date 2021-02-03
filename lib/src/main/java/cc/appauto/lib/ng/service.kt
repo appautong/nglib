@@ -163,7 +163,7 @@ class AppAutoService: AccessibilityService() {
         super.onCreate()
 
         AppAutoContext.autoSrv = this
-        AppAutoContext.initAppContext(this)
+        AppAutoContext.setupRuntime(this)
         Log.i(TAG, "$name: onCreate ${System.identityHashCode(this)}")
     }
 
@@ -193,7 +193,6 @@ class AppAutoNotificationService: NotificationListenerService() {
         super.onCreate()
 
         AppAutoContext.notiSrv = this
-        AppAutoContext.initAppContext(this)
         Log.i(TAG, "$name: onCreate ${System.identityHashCode(this)}")
     }
 

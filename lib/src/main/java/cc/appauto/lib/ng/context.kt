@@ -18,14 +18,23 @@ import android.view.View
 import android.view.WindowManager
 import android.view.accessibility.AccessibilityManager
 import cc.appauto.lib.R
+import com.alibaba.fastjson.JSON
 import com.alibaba.fastjson.JSONObject
-import org.mozilla.javascript.ScriptableObject
+import org.mozilla.javascript.Scriptable
 import java.util.concurrent.Executor
 import java.util.concurrent.FutureTask
+import org.mozilla.javascript.ScriptableObject
+import org.mozilla.javascript.commonjs.module.Require
+import java.util.concurrent.ConcurrentHashMap
 import org.mozilla.javascript.Context as JSContext
 
 object AppAutoContext: Executor {
-    private const val name = "autoctx"
+    internal const val name = "autoctx"
+
+    const val ERROR_NOT_READY = "AppAutoContext is not ready: accessibility service is not connected yet"
+
+    val ready
+        get() = initialized && accessibilityConnected
 
     // current accessibility service and notification listener service
     var autoSrv: AppAutoService? = null
@@ -38,31 +47,41 @@ object AppAutoContext: Executor {
     var listenerConnected: Boolean = false
         internal set
 
-    // android application context related
+    // android application context
     lateinit var appContext: Context
-    // set when connected to accessibility service or notification listener service
-    var appContextInited = false
+    // flag indicates that whether all the underline runtime of appauto context is initialized
+    // set when setupRuntime invoked after accessibility service is connected at the first time
+    var initialized = false
 
+    lateinit var httpd: Httpd
+        private set
     lateinit var httpClient: HttpClient
         private set
 
+    // javascript runtime related
     internal lateinit var jsContext: JSContext
         private set
-
     internal lateinit var jsGlobalScope: ScriptableObject
         private set
-
-    var workHandler: Handler
+    internal lateinit var jsRequire: Require
         private set
 
+    // separate thread/handler to run the automation javascript
     private var workThread: HandlerThread = HandlerThread("${TAG}_${name}_thread")
+    private var workHandler: Handler
+        private set
+
     private lateinit var accessibilityMgr: AccessibilityManager
     private lateinit var notificationMgr: NotificationManager
     private lateinit var windowManager: WindowManager
+
+    // autodraw related
+    lateinit var autoDrawImage: AutoDraw
+        private set
+    var autoDrawReady = false
+        private set
     private lateinit var autoDrawRoot: View
-    private lateinit var autoDrawImage: AutoDraw
     private var autoDrawWindowParams = WindowManager.LayoutParams()
-    private var autoDrawReady = false
 
     init {
         workThread.start()
@@ -70,13 +89,46 @@ object AppAutoContext: Executor {
 
         // initialize javascript context in work thread
         runWork {
-            jsContext = JSContext.enter()
-            // make all Packages in global scope sealed
-            jsGlobalScope = jsContext.initStandardObjects(null, true)
-            jsContext.optimizationLevel = -1
-            Log.i(TAG, "$name: js context inited")
+            initJavascriptRuntime()
+            initAutoDrawParam()
         }
+    }
 
+    internal fun setupRuntime(ctx: Context) {
+        // double check the flag
+        if (initialized) return
+        runWork {
+            if (initialized) return@runWork
+
+            appContext = ctx.applicationContext
+            accessibilityMgr = appContext.getSystemService(Context.ACCESSIBILITY_SERVICE) as AccessibilityManager
+            notificationMgr = appContext.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            httpClient = HttpClient(appContext)
+            httpd = Httpd(appContext)
+            httpd.start()
+
+            accessibilityMgr.addAccessibilityStateChangeListener {
+                workHandler.postAtFrontOfQueue { onStateChange(it) }
+            }
+            windowManager = appContext.getSystemService(Context.WINDOW_SERVICE) as WindowManager
+            autoDrawRoot = LayoutInflater.from(appContext).inflate(R.layout.autodraw, null)
+            autoDrawImage = autoDrawRoot.findViewById(R.id.imgAutoDraw)
+
+            setupAutoDrawOverlay()
+            setupJavascriptRequire()
+            initialized = true
+        }
+    }
+
+    private fun initJavascriptRuntime() {
+        jsContext = JSContext.enter()
+        // make all Packages in global scope sealed
+        jsGlobalScope = jsContext.initStandardObjects(null, true)
+        jsContext.optimizationLevel = -1
+        Log.i(TAG, "$name: js context inited")
+    }
+
+    private fun initAutoDrawParam() {
         // initialize the window parameters for the autodraw view
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             autoDrawWindowParams.type = WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
@@ -92,25 +144,12 @@ object AppAutoContext: Executor {
         autoDrawWindowParams.y = 0
     }
 
-    @Synchronized
-    fun initAppContext(ctx: Context) {
-        if (!appContextInited) {
-            appContext = ctx.applicationContext
-            accessibilityMgr = appContext.getSystemService(Context.ACCESSIBILITY_SERVICE) as AccessibilityManager
-            notificationMgr = appContext.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-            httpClient = HttpClient(appContext)
-            accessibilityMgr.addAccessibilityStateChangeListener {
-                workHandler.postAtFrontOfQueue { onStateChange(it) }
-            }
-
-            windowManager = appContext.getSystemService(Context.WINDOW_SERVICE) as WindowManager
-            autoDrawRoot = LayoutInflater.from(appContext).inflate(R.layout.autodraw, null)
-            autoDrawImage = autoDrawRoot.findViewById(R.id.imgAutoDraw)
-
-            setupAutoDrawOverlay()
-
-            appContextInited = true
-        }
+    private fun setupJavascriptRequire() {
+        val modules = mutableListOf<String>()
+        modules.add(appContext.filesDir.path)
+        appContext.getExternalFilesDir(null)?.let { modules.add(it.path) }
+        jsRequire = installRequire(modules, false)
+        Log.i(TAG, "$name: javascript require installed with module path: ${JSON.toJSONString(modules)}")
     }
 
     @Synchronized
@@ -144,29 +183,29 @@ object AppAutoContext: Executor {
         }
     }
 
-    val topAppHierarchyString: String
-        get() {
-            if (!accessibilityConnected) {
-                return "accessibility service not connected yet"
-            }
-            return autoSrv.getHierarchyString()
-        }
+    val topAppHierarchyString
+        get() = if (!ready) ERROR_NOT_READY else autoSrv.getHierarchyString()
 
     // run the work in appauto context's work thread
     internal fun runWork(r: Runnable) {
         workHandler.post(r)
     }
 
-    fun markBound(bound: Rect, paint: Paint? = null) {
-        if (!appContextInited) {
-            Log.w(TAG, "$name: markBound: context is not initialized, please retry after accessibility service connected")
-            return
+    fun markBound(bound: Rect, paint: Paint? = null): JSONObject {
+        val ret = JSONObject()
+        if (!ready) {
+            return ret.also { it["error"] = ERROR_NOT_READY }
         }
         if (!autoDrawReady)  {
-            setupAutoDrawOverlay()
-            return
+            return ret.also { it["error"] = "need draw overlay permission, invoke openOverlayPermissionSetting first"}
         }
         autoDrawImage.drawRectStroke(bound, paint)
+        return ret.also { ret["result"] = "success" }
+    }
+
+    fun automatorOf(name: String = "NA"): AppAutomator? {
+        val s = autoSrv ?: return null;
+        return AppAutomator(s, name)
     }
 
     // if ctx is corresponding to a activity, show a alert dialog to confirm go to the permission
@@ -189,15 +228,15 @@ object AppAutoContext: Executor {
 
     private fun _executeScript(src: String): JSONObject {
         val ret = JSONObject()
-        if (!appContextInited) {
-            val log = "executeScript: context is not initialized, please retry after accessibility service connected"
+        if (!ready) {
+            val log = "executeScript: $ERROR_NOT_READY"
             ret["error"] = log
             Log.e(TAG, "$name: $log")
             return ret
         }
         try {
             val s = newScope(jsGlobalScope)
-            val obj = jsContext.evaluateString(s, src, "<execute>", -1, null)
+            val obj = jsContext.evaluateString(s, src, "<executeScript>", -1, null)
             ret["result"] = org.mozilla.javascript.Context.toString(obj)
         } catch (e: Exception) {
             ret["error"] = "execute script leads to exception: ${Log.getStackTraceString(e)}"
@@ -209,7 +248,6 @@ object AppAutoContext: Executor {
     // execute the javascript in the work thread
     fun executeScript(src: String): JSONObject {
         val tid = android.os.Process.myTid()
-        Log.i(TAG, "$name: executeScript, tid: $tid, work thread id: ${workThread.threadId}")
         if (tid == workThread.threadId) {
             return _executeScript(src)
         }
@@ -223,5 +261,21 @@ object AppAutoContext: Executor {
 
     override fun execute(command: Runnable?) {
         command?.let { runWork(command) }
+    }
+
+    fun resetJavascriptRequire(): JSONObject {
+        val ret = JSONObject()
+        if (!initialized) return ret.also {  it["error"] = ERROR_NOT_READY}
+
+        val field = Require::class.java.getDeclaredField("exportedModuleInterfaces")
+        field.isAccessible = true
+        val m = field.get(jsRequire)
+        if (m is ConcurrentHashMap<*, *>) {
+            m.clear()
+            ret["result"] = "clear the exportedModuleInterfaces successfully"
+        } else {
+            ret["error"] = "can not clear exportedModuleInterfaces: $m"
+        }
+        return ret
     }
 }

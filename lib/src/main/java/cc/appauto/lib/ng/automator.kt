@@ -86,7 +86,7 @@ class AutomationStep(val name: String, val automator: AppAutomator) {
     }
 }
 
-class AppAutomator(val srv: AccessibilityService) {
+class AppAutomator(val srv: AccessibilityService, val name: String) {
     private val privateData = JSONObject()
 
     var allStepsSucceed = false
@@ -107,7 +107,7 @@ class AppAutomator(val srv: AccessibilityService) {
         var defaultPostActDelay: Long = 1000
     }
 
-    fun newStep(name: String): AutomationStep {
+    fun stepOf(name: String): AutomationStep {
         val step = AutomationStep(name, this)
         steps.add(step)
         return step
@@ -133,7 +133,7 @@ class AppAutomator(val srv: AccessibilityService) {
         close()
     }
 
-    fun newOpeningAppStep(packageName: String): AutomationStep {
+    fun stepOfOpeningApp(packageName: String): AutomationStep {
         val step = AutomationStep("step_open_app_$packageName", this)
         step.retry(0).postActionDelay(0).action {
             quitApp(srv, packageName)

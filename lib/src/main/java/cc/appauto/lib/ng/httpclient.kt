@@ -10,7 +10,7 @@ import com.android.volley.toolbox.StringRequest
 import com.android.volley.toolbox.Volley
 import java.util.concurrent.TimeUnit
 
-class HttpClient(val ctx: Context) {
+class HttpClient internal constructor(val ctx: Context) {
     private var queue: RequestQueue = Volley.newRequestQueue(this.ctx)
 
     fun close() {
