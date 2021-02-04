@@ -1,5 +1,6 @@
 package cc.appauto.lib.ng
 
+import android.app.Activity
 import android.app.AlertDialog
 import android.app.NotificationManager
 import android.content.Context
@@ -20,12 +21,11 @@ import android.view.accessibility.AccessibilityManager
 import cc.appauto.lib.R
 import com.alibaba.fastjson.JSON
 import com.alibaba.fastjson.JSONObject
-import org.mozilla.javascript.Scriptable
-import java.util.concurrent.Executor
-import java.util.concurrent.FutureTask
 import org.mozilla.javascript.ScriptableObject
 import org.mozilla.javascript.commonjs.module.Require
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.Executor
+import java.util.concurrent.FutureTask
 import org.mozilla.javascript.Context as JSContext
 
 object AppAutoContext: Executor {
@@ -48,7 +48,7 @@ object AppAutoContext: Executor {
         internal set
 
     // android application context
-    lateinit var appContext: Context
+    internal lateinit var appContext: Context
     // flag indicates that whether all the underline runtime of appauto context is initialized
     // set when setupRuntime invoked after accessibility service is connected at the first time
     var initialized = false
@@ -68,7 +68,7 @@ object AppAutoContext: Executor {
 
     // separate thread/handler to run the automation javascript
     private var workThread: HandlerThread = HandlerThread("${TAG}_${name}_thread")
-    private var workHandler: Handler
+    var workHandler: Handler
         private set
 
     private lateinit var accessibilityMgr: AccessibilityManager
@@ -156,15 +156,19 @@ object AppAutoContext: Executor {
     private fun setupAutoDrawOverlay() {
         if (autoDrawReady) return
 
-        if (Settings.canDrawOverlays(appContext)) {
-            try {
-                windowManager.addView(autoDrawRoot, autoDrawWindowParams)
-                autoDrawReady = true
-            } catch (e: Exception) {
-                Log.e(TAG, "checkAndSetupAutoDrawOverlay: add autodraw root leads to exception: ${Log.getStackTraceString(e)}")
-            }
-        } else {
-            openOverlayPermissionSetting(null)
+        if (!initialized) {
+            Log.w(TAG, "$name: setupAutoDrawOverlay: $ERROR_NOT_READY")
+            return
+        }
+
+        if (!Settings.canDrawOverlays(appContext)) return
+
+        try {
+            windowManager.addView(autoDrawRoot, autoDrawWindowParams)
+            autoDrawReady = true
+            Log.i(TAG, "$name: setupAutoDrawOverlay successfully")
+        } catch (e: Exception) {
+            Log.e(TAG, "$name: setupAutoDrawOverlay: add autodraw root leads to exception: ${Log.getStackTraceString(e)}")
         }
     }
 
@@ -186,8 +190,8 @@ object AppAutoContext: Executor {
     val topAppHierarchyString
         get() = if (!ready) ERROR_NOT_READY else autoSrv.getHierarchyString()
 
-    // run the work in appauto context's work thread
-    internal fun runWork(r: Runnable) {
+    // run the work in appauto context's automation work thread
+    fun runWork(r: Runnable) {
         workHandler.post(r)
     }
 
@@ -208,12 +212,10 @@ object AppAutoContext: Executor {
         return AppAutomator(s, name)
     }
 
-    // if ctx is corresponding to a activity, show a alert dialog to confirm go to the permission
-    // otherwise, goto overlay permission setting directly
-    fun openOverlayPermissionSetting(ctx: Context? = null) {
+    fun openOverlayPermissionSetting(ctx: Context) {
         val intent = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION)
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        if (ctx == null) {
+        if (ctx !is Activity) {
             appContext.startActivity(intent)
             return
         }
@@ -221,9 +223,25 @@ object AppAutoContext: Executor {
         builder.setTitle(R.string.appauto_require_permission)
                 .setMessage(R.string.appauto_require_overlay_permission)
                 .setIcon(android.R.drawable.ic_dialog_alert)
-        builder.setPositiveButton(android.R.string.yes) { _, _ ->
+        builder.setPositiveButton(android.R.string.yes) { _, _ -> ctx.startActivity(intent) }
+                .setNegativeButton(android.R.string.no) { _,_ -> {}}
+                .show()
+    }
+
+    fun openAccessibilitySetting(ctx: Context) {
+        val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        if (ctx !is Activity) {
             ctx.startActivity(intent)
-        }.show()
+            return
+        }
+        val builder = AlertDialog.Builder(ctx)
+        builder.setTitle(R.string.appauto_require_permission)
+                .setMessage(R.string.appauto_require_accessibility_permission)
+                .setIcon(android.R.drawable.ic_dialog_alert)
+        builder.setPositiveButton(android.R.string.yes) { _, _ -> ctx.startActivity(intent) }
+                .setNegativeButton(android.R.string.no) { _,_ -> {}}
+                .show()
     }
 
     private fun _executeScript(src: String): JSONObject {
@@ -239,7 +257,7 @@ object AppAutoContext: Executor {
             val obj = jsContext.evaluateString(s, src, "<executeScript>", -1, null)
             ret["result"] = org.mozilla.javascript.Context.toString(obj)
         } catch (e: Exception) {
-            ret["error"] = "execute script leads to exception: ${Log.getStackTraceString(e)}"
+            ret["error"] = "$name: execute script leads to exception: ${Log.getStackTraceString(e)}"
             Log.e(TAG, ret.getString("error"))
         }
         return ret
