@@ -23,6 +23,7 @@ import com.alibaba.fastjson.JSON
 import com.alibaba.fastjson.JSONObject
 import org.mozilla.javascript.ScriptableObject
 import org.mozilla.javascript.commonjs.module.Require
+import java.util.concurrent.Callable
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executor
 import java.util.concurrent.FutureTask
@@ -33,6 +34,7 @@ object AppAutoContext: Executor {
 
     const val ERROR_NOT_READY = "AppAutoContext is not ready: accessibility service is not connected yet"
 
+    // whether automation ready
     val ready
         get() = initialized && accessibilityConnected
 
@@ -152,16 +154,20 @@ object AppAutoContext: Executor {
         Log.i(TAG, "$name: javascript require installed with module path: ${JSON.toJSONString(modules)}")
     }
 
+    /*** setup overlay draw
+     *  return true draw overlay permission acquired and the auto draw root view added;
+     *  otherwise, return false
+     */
     @Synchronized
-    private fun setupAutoDrawOverlay() {
-        if (autoDrawReady) return
+    internal fun setupAutoDrawOverlay(): Boolean {
+        if (autoDrawReady) return true
 
         if (!initialized) {
             Log.w(TAG, "$name: setupAutoDrawOverlay: $ERROR_NOT_READY")
-            return
+            return false
         }
 
-        if (!Settings.canDrawOverlays(appContext)) return
+        if (!Settings.canDrawOverlays(appContext)) return false
 
         try {
             windowManager.addView(autoDrawRoot, autoDrawWindowParams)
@@ -170,6 +176,7 @@ object AppAutoContext: Executor {
         } catch (e: Exception) {
             Log.e(TAG, "$name: setupAutoDrawOverlay: add autodraw root leads to exception: ${Log.getStackTraceString(e)}")
         }
+        return true
     }
 
     private fun onStateChange(enabled: Boolean) {
@@ -223,7 +230,7 @@ object AppAutoContext: Executor {
         builder.setTitle(R.string.appauto_require_permission)
                 .setMessage(R.string.appauto_require_overlay_permission)
                 .setIcon(android.R.drawable.ic_dialog_alert)
-        builder.setPositiveButton(android.R.string.yes) { _, _ -> ctx.startActivity(intent) }
+                .setPositiveButton(android.R.string.yes) { _, _ -> ctx.startActivity(intent) }
                 .setNegativeButton(android.R.string.no) { _,_ -> {}}
                 .show()
     }
@@ -239,46 +246,21 @@ object AppAutoContext: Executor {
         builder.setTitle(R.string.appauto_require_permission)
                 .setMessage(R.string.appauto_require_accessibility_permission)
                 .setIcon(android.R.drawable.ic_dialog_alert)
-        builder.setPositiveButton(android.R.string.yes) { _, _ -> ctx.startActivity(intent) }
+                .setPositiveButton(android.R.string.yes) { _, _ -> ctx.startActivity(intent) }
                 .setNegativeButton(android.R.string.no) { _,_ -> {}}
                 .show()
     }
 
-    private fun _executeScript(src: String): JSONObject {
-        val ret = JSONObject()
-        if (!ready) {
-            val log = "executeScript: $ERROR_NOT_READY"
-            ret["error"] = log
-            Log.e(TAG, "$name: $log")
-            return ret
-        }
-        try {
-            val s = newScope(jsGlobalScope)
-            val obj = jsContext.evaluateString(s, src, "<executeScript>", -1, null)
-            ret["result"] = org.mozilla.javascript.Context.toString(obj)
-        } catch (e: Exception) {
-            ret["error"] = "$name: execute script leads to exception: ${Log.getStackTraceString(e)}"
-            Log.e(TAG, ret.getString("error"))
-        }
-        return ret
-    }
 
-    // execute the javascript in the work thread
-    fun executeScript(src: String): JSONObject {
+    fun<V> executeTask(c: Callable<V>): V {
         val tid = android.os.Process.myTid()
         if (tid == workThread.threadId) {
-            return _executeScript(src)
+            return c.call()
         }
-        val f = FutureTask {
-            _executeScript(src)
+        return FutureTask<V> { c.call() }.let {
+            execute(it)
+            it.get()
         }
-        execute(f)
-
-        return f.get()
-    }
-
-    override fun execute(command: Runnable?) {
-        command?.let { runWork(command) }
     }
 
     fun resetJavascriptRequire(): JSONObject {
@@ -295,5 +277,10 @@ object AppAutoContext: Executor {
             ret["error"] = "can not clear exportedModuleInterfaces: $m"
         }
         return ret
+    }
+
+
+    override fun execute(command: Runnable?) {
+        command?.let { runWork(command) }
     }
 }
