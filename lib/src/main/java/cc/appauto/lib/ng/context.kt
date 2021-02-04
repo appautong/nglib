@@ -5,6 +5,7 @@ import android.app.AlertDialog
 import android.app.NotificationManager
 import android.content.Context
 import android.content.Intent
+import android.content.res.AssetManager
 import android.graphics.Paint
 import android.graphics.PixelFormat
 import android.graphics.Rect
@@ -76,6 +77,7 @@ object AppAutoContext: Executor {
     private lateinit var accessibilityMgr: AccessibilityManager
     private lateinit var notificationMgr: NotificationManager
     private lateinit var windowManager: WindowManager
+    private lateinit var assetManager: AssetManager
 
     // autodraw related
     lateinit var autoDrawImage: AutoDraw
@@ -101,24 +103,29 @@ object AppAutoContext: Executor {
         if (initialized) return
         runWork {
             if (initialized) return@runWork
+            initialized = true
 
             appContext = ctx.applicationContext
             accessibilityMgr = appContext.getSystemService(Context.ACCESSIBILITY_SERVICE) as AccessibilityManager
             notificationMgr = appContext.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-            httpClient = HttpClient(appContext)
-            httpd = Httpd(appContext)
-            httpd.start()
+            windowManager = appContext.getSystemService(Context.WINDOW_SERVICE) as WindowManager
+            assetManager = appContext.assets
 
             accessibilityMgr.addAccessibilityStateChangeListener {
                 workHandler.postAtFrontOfQueue { onStateChange(it) }
             }
-            windowManager = appContext.getSystemService(Context.WINDOW_SERVICE) as WindowManager
+
+
+            httpClient = HttpClient(appContext)
+            httpd = Httpd(appContext)
+            httpd.start()
+
             autoDrawRoot = LayoutInflater.from(appContext).inflate(R.layout.autodraw, null)
             autoDrawImage = autoDrawRoot.findViewById(R.id.imgAutoDraw)
 
             setupAutoDrawOverlay()
-            setupJavascriptRequire()
-            initialized = true
+            setupJavascriptRuntime()
+            Log.i(TAG, "$name: setup context related runtime successfully")
         }
     }
 
@@ -146,7 +153,11 @@ object AppAutoContext: Executor {
         autoDrawWindowParams.y = 0
     }
 
-    private fun setupJavascriptRequire() {
+    private fun setupJavascriptRuntime() {
+        evaluateJavascript(assetManager.open("autojs/appauto.js").readBytes().decodeToString(), true).also {
+            if (it.containsKey("error")) Log.e(TAG, "$name: load autojs/apptuo.js: ${it.toJSONString()}")
+            else Log.i(TAG, "$name: load core js files successfully ")
+        }
         val modules = mutableListOf<String>()
         modules.add(appContext.filesDir.path)
         appContext.getExternalFilesDir(null)?.let { modules.add(it.path) }
@@ -230,8 +241,8 @@ object AppAutoContext: Executor {
         builder.setTitle(R.string.appauto_require_permission)
                 .setMessage(R.string.appauto_require_overlay_permission)
                 .setIcon(android.R.drawable.ic_dialog_alert)
-                .setPositiveButton(android.R.string.yes) { _, _ -> ctx.startActivity(intent) }
-                .setNegativeButton(android.R.string.no) { _,_ -> {}}
+                .setPositiveButton(android.R.string.ok) { _, _ -> ctx.startActivity(intent) }
+                .setNegativeButton(android.R.string.cancel) { _,_ -> {}}
                 .show()
     }
 
@@ -246,8 +257,8 @@ object AppAutoContext: Executor {
         builder.setTitle(R.string.appauto_require_permission)
                 .setMessage(R.string.appauto_require_accessibility_permission)
                 .setIcon(android.R.drawable.ic_dialog_alert)
-                .setPositiveButton(android.R.string.yes) { _, _ -> ctx.startActivity(intent) }
-                .setNegativeButton(android.R.string.no) { _,_ -> {}}
+                .setPositiveButton(android.R.string.ok) { _, _ -> ctx.startActivity(intent) }
+                .setNegativeButton(android.R.string.cancel) { _,_ -> {}}
                 .show()
     }
 

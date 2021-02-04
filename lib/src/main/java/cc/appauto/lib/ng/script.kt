@@ -72,7 +72,7 @@ internal fun AppAutoContext.installRequire(modulePath: List<String>, sandbox: Bo
 }
 
 // evaluate javascript in work thread
-private fun AppAutoContext.evaluateJavascript(content: String): JSONObject {
+internal fun AppAutoContext.evaluateJavascript(content: String, useGlobalScope: Boolean = false): JSONObject {
     if (!ready) {
         val log = "evaluateJavaScript: $ERROR_NOT_READY"
         Log.e(TAG, "$name: $log")
@@ -81,7 +81,7 @@ private fun AppAutoContext.evaluateJavascript(content: String): JSONObject {
     return executeTask {
         val ret = JSONObject()
         try {
-            val s = newScope(jsGlobalScope)
+            val s = if (useGlobalScope) jsGlobalScope else newScope(jsGlobalScope)
             val obj = jsContext.evaluateString(s, content, "<evaluateJavaScript>", -1, null)
             ret["result"] = org.mozilla.javascript.Context.toString(obj)
         } catch (e: Exception) {
