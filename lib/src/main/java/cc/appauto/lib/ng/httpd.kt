@@ -1,19 +1,33 @@
 package cc.appauto.lib.ng
 
 import android.content.Context
+import android.util.Log
 import com.alibaba.fastjson.JSON
 import com.alibaba.fastjson.JSONObject
 import fi.iki.elonen.NanoHTTPD
 import java.io.File
 
 class Httpd internal constructor(val ctx: Context, val port: Int=8900): NanoHTTPD(port) {
+    private val name = "httpd"
+
     private fun handleResetJsRequire(session: IHTTPSession): JSONObject {
-        return AppAutoContext.resetJavascriptRequire()
+        if (!AppAutoContext.initialized) return JSONObject().also { it["error"] = AppAutoContext.ERR_NOT_READY }
+        return AppAutoContext.jsRuntime.resetRequire(AppAutoContext.jsRuntime.require)
     }
 
     private fun handleResetJsGlobal(session: IHTTPSession): JSONObject {
-        AppAutoContext.resetJavascriptGlobal()
-        return JSONObject().also { it["result"] = "success" }
+        if (!AppAutoContext.initialized) return JSONObject().also { it["error"] = AppAutoContext.ERR_NOT_READY }
+        val js = session.parms["file"]
+        if (js.isNullOrEmpty()) return JSONObject().also { it["error"] = "parameter file is required"}
+
+        val scope = JavascriptRuntime.ctx.initStandardObjects(null, true)
+        val require = JavascriptRuntime.installRequire(scope, JavascriptRuntime.requireBuilder)
+
+        val content = File(js).readText()
+        return JavascriptRuntime.evaluateJavascript(content, scope).also {
+            if (it.containsKey("error")) Log.e(TAG, "$name load script $js failed: ${it.toJSONString()}")
+            else Log.i(TAG, "$name: load script $js successfully ")
+        }
     }
 
     private fun handleExecJS(session: IHTTPSession): JSONObject {
@@ -23,7 +37,9 @@ class Httpd internal constructor(val ctx: Context, val port: Int=8900): NanoHTTP
             ret["error"] = "parameter file is required"
             return ret
         }
-        return File(js).run { AppAutoContext.execJavascript(this) }
+        if (!AppAutoContext.initialized) return ret.also { it["error"] = AppAutoContext.ERR_NOT_READY }
+
+        return File(js).run { AppAutoContext.jsRuntime.execScript(this) }
     }
 
     override fun serve(session: IHTTPSession): Response {

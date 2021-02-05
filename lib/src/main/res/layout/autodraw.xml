@@ -7,7 +7,7 @@
     android:theme="@style/Theme.AppCompat.DayNight.NoActionBar"
     android:layout_gravity="top|start">
 
-    <cc.appauto.lib.ng.AutoDraw
+    <cc.appauto.lib.ng.AutoDrawView
         android:id="@+id/imgAutoDraw"
         android:contentDescription="@string/autodraw_image_desc"
         android:layout_width="match_parent"

@@ -16,9 +16,6 @@ fun AppAutoContext.checkPermissions(ctx: Context): Boolean {
                 openOverlayPermissionSetting(ctx)
                 false
             }
-            !autoDrawReady -> {
-                setupAutoDrawOverlay()
-            }
             else -> true
         }
     }
