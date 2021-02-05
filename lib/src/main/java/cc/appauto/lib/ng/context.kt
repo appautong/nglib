@@ -22,10 +22,6 @@ object AppAutoContext: Executor {
 
     const val ERR_NOT_READY = "appauto context not ready: accessibility service is not connected yet"
 
-    // whether automation ready
-    val ready
-        get() = initialized && accessibilityConnected
-
     // current accessibility service and notification listener service
     var autoSrv: AppAutoService? = null
         internal set
@@ -115,7 +111,7 @@ object AppAutoContext: Executor {
     }
 
     val topAppHierarchyString
-        get() = if (!ready) ERR_NOT_READY else autoSrv.getHierarchyString()
+        get() = if (!initialized) ERR_NOT_READY else autoSrv.getHierarchyString()
 
 
     fun automatorOf(name: String = "NA"): AppAutomator? {

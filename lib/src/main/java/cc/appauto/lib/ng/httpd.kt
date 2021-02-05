@@ -20,14 +20,20 @@ class Httpd internal constructor(val ctx: Context, val port: Int=8900): NanoHTTP
         val js = session.parms["file"]
         if (js.isNullOrEmpty()) return JSONObject().also { it["error"] = "parameter file is required"}
 
-        val scope = JavascriptRuntime.ctx.initStandardObjects(null, true)
-        val require = JavascriptRuntime.installRequire(scope, JavascriptRuntime.requireBuilder)
+        return AppAutoContext.executeTask {
+            val jsRuntime = AppAutoContext.jsRuntime
+            val scope = jsRuntime.ctx.initStandardObjects(null, true)
+            val require = jsRuntime.installRequire(scope, JavascriptRuntime.requireBuilder)
+            jsRuntime.require = require
+            jsRuntime.scopeGlobal = scope
 
-        val content = File(js).readText()
-        return JavascriptRuntime.evaluateJavascript(content, scope).also {
-            if (it.containsKey("error")) Log.e(TAG, "$name load script $js failed: ${it.toJSONString()}")
-            else Log.i(TAG, "$name: load script $js successfully ")
+            val content = File(js).readText()
+            jsRuntime.evaluateJavascript(content, scope).also {
+                if (it.containsKey("error")) Log.e(TAG, "$name load script $js failed: ${it.toJSONString()}")
+                else Log.i(TAG, "$name: load script $js successfully ")
+            }
         }
+
     }
 
     private fun handleExecJS(session: IHTTPSession): JSONObject {
