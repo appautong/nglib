@@ -24,8 +24,8 @@ import com.alibaba.fastjson.JSON
 import com.alibaba.fastjson.JSONObject
 import org.mozilla.javascript.ScriptableObject
 import org.mozilla.javascript.commonjs.module.Require
+import org.mozilla.javascript.commonjs.module.RequireBuilder
 import java.util.concurrent.Callable
-import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executor
 import java.util.concurrent.FutureTask
 import org.mozilla.javascript.Context as JSContext
@@ -65,8 +65,8 @@ object AppAutoContext: Executor {
     internal lateinit var jsContext: JSContext
         private set
     internal lateinit var jsGlobalScope: ScriptableObject
-        private set
     internal lateinit var jsRequire: Require
+    internal lateinit var jsRequireBuilder: RequireBuilder
         private set
 
     // separate thread/handler to run the automation javascript
@@ -92,7 +92,7 @@ object AppAutoContext: Executor {
         workHandler = Handler(workThread.looper)
 
         // initialize javascript context in work thread
-        runWork {
+        submitTask {
             initJavascriptRuntime()
             initAutoDrawParam()
         }
@@ -101,8 +101,8 @@ object AppAutoContext: Executor {
     internal fun setupRuntime(ctx: Context) {
         // double check the flag
         if (initialized) return
-        runWork {
-            if (initialized) return@runWork
+        submitTask {
+            if (initialized) return@submitTask
             initialized = true
 
             appContext = ctx.applicationContext
@@ -153,16 +153,26 @@ object AppAutoContext: Executor {
         autoDrawWindowParams.y = 0
     }
 
-    private fun setupJavascriptRuntime() {
-        evaluateJavascript(assetManager.open("autojs/appauto.js").readBytes().decodeToString(), true).also {
+    // create and install require on the given scope, and load autox/core.js
+    internal fun setupJavascriptScope(scope: ScriptableObject)  {
+        jsRequire = jsRequireBuilder.createRequire(jsContext, scope)
+        jsRequire.install(scope)
+
+        evaluateJavascript(assetManager.open("autox/core.js").readBytes().decodeToString(), scope).also {
             if (it.containsKey("error")) Log.e(TAG, "$name: load autojs/apptuo.js: ${it.toJSONString()}")
             else Log.i(TAG, "$name: load core js files successfully ")
         }
+    }
+
+    private fun setupJavascriptRuntime() {
         val modules = mutableListOf<String>()
         modules.add(appContext.filesDir.path)
+        Log.i(TAG, "$name: javascript require module path: ${JSON.toJSONString(modules)}")
+
         appContext.getExternalFilesDir(null)?.let { modules.add(it.path) }
-        jsRequire = installRequire(modules, false)
-        Log.i(TAG, "$name: javascript require installed with module path: ${JSON.toJSONString(modules)}")
+        jsRequireBuilder = createRequireBuilder(modules, false)
+
+        setupJavascriptScope(jsGlobalScope)
     }
 
     /*** setup overlay draw
@@ -198,8 +208,8 @@ object AppAutoContext: Executor {
     // dump the top app node recursively in appauto context's work thread
     fun dumpTopActiveApp() {
         val s = autoSrv ?: return;
-        runWork {
-            val ht = HierarchyTree.from(s) ?: return@runWork
+        submitTask {
+            val ht = HierarchyTree.from(s) ?: return@submitTask
             ht.print()
             ht.recycle()
         }
@@ -208,10 +218,6 @@ object AppAutoContext: Executor {
     val topAppHierarchyString
         get() = if (!ready) ERROR_NOT_READY else autoSrv.getHierarchyString()
 
-    // run the work in appauto context's automation work thread
-    fun runWork(r: Runnable) {
-        workHandler.post(r)
-    }
 
     fun markBound(bound: Rect, paint: Paint? = null): JSONObject {
         val ret = JSONObject()
@@ -263,6 +269,7 @@ object AppAutoContext: Executor {
     }
 
 
+    // execute task in appauto context's automation work thread and return the result
     fun<V> executeTask(c: Callable<V>): V {
         val tid = android.os.Process.myTid()
         if (tid == workThread.threadId) {
@@ -274,24 +281,12 @@ object AppAutoContext: Executor {
         }
     }
 
-    fun resetJavascriptRequire(): JSONObject {
-        val ret = JSONObject()
-        if (!initialized) return ret.also {  it["error"] = ERROR_NOT_READY}
-
-        val field = Require::class.java.getDeclaredField("exportedModuleInterfaces")
-        field.isAccessible = true
-        val m = field.get(jsRequire)
-        if (m is ConcurrentHashMap<*, *>) {
-            m.clear()
-            ret["result"] = "clear the exportedModuleInterfaces successfully"
-        } else {
-            ret["error"] = "can not clear exportedModuleInterfaces: $m"
-        }
-        return ret
+    // submit the work in appauto context's automation work thread and return immediately
+    fun submitTask(r: Runnable) {
+        workHandler.post(r)
     }
 
-
     override fun execute(command: Runnable?) {
-        command?.let { runWork(command) }
+        command?.let { submitTask(command) }
     }
 }

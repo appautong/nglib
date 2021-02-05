@@ -10,6 +10,7 @@ import org.mozilla.javascript.commonjs.module.provider.SoftCachingModuleScriptPr
 import org.mozilla.javascript.commonjs.module.provider.UrlModuleSourceProvider
 import java.io.File
 import java.net.URI
+import java.util.concurrent.ConcurrentHashMap
 
 fun AppAutoContext.execJavascript(f: File): JSONObject {
     return try {
@@ -43,7 +44,7 @@ internal fun AppAutoContext.newScope(scope: ScriptableObject): Scriptable {
     return obj
 }
 
-internal fun AppAutoContext.installRequire(modulePath: List<String>, sandbox: Boolean): Require {
+internal fun AppAutoContext.createRequireBuilder(modulePath: List<String>, sandbox: Boolean): RequireBuilder {
     val rb = RequireBuilder()
     rb.setSandboxed(sandbox)
     val uris = mutableListOf<URI>();
@@ -66,13 +67,11 @@ internal fun AppAutoContext.installRequire(modulePath: List<String>, sandbox: Bo
             UrlModuleSourceProvider(uris, null)
         )
     )
-    val require = rb.createRequire(jsContext, jsGlobalScope)
-    require.install(jsGlobalScope)
-    return require
+    return rb
 }
 
 // evaluate javascript in work thread
-internal fun AppAutoContext.evaluateJavascript(content: String, useGlobalScope: Boolean = false): JSONObject {
+internal fun AppAutoContext.evaluateJavascript(content: String, scope: ScriptableObject? = null): JSONObject {
     if (!ready) {
         val log = "evaluateJavaScript: $ERROR_NOT_READY"
         Log.e(TAG, "$name: $log")
@@ -81,7 +80,7 @@ internal fun AppAutoContext.evaluateJavascript(content: String, useGlobalScope: 
     return executeTask {
         val ret = JSONObject()
         try {
-            val s = if (useGlobalScope) jsGlobalScope else newScope(jsGlobalScope)
+            val s = scope ?: jsGlobalScope
             val obj = jsContext.evaluateString(s, content, "<evaluateJavaScript>", -1, null)
             ret["result"] = org.mozilla.javascript.Context.toString(obj)
         } catch (e: Exception) {
@@ -90,4 +89,29 @@ internal fun AppAutoContext.evaluateJavascript(content: String, useGlobalScope: 
         }
         ret
     }
+}
+
+internal fun AppAutoContext.resetJavascriptGlobal() {
+    submitTask {
+        jsGlobalScope = jsContext.initStandardObjects(null, true)
+        setupJavascriptScope(jsGlobalScope)
+    }
+}
+
+internal fun AppAutoContext.resetJavascriptRequire(): JSONObject {
+    val ret = JSONObject()
+    if (!initialized) return ret.also {  it["error"] =
+        ERROR_NOT_READY
+    }
+
+    val field = Require::class.java.getDeclaredField("exportedModuleInterfaces")
+    field.isAccessible = true
+    val m = field.get(jsRequire)
+    if (m is ConcurrentHashMap<*, *>) {
+        m.clear()
+        ret["result"] = "clear the exportedModuleInterfaces successfully"
+    } else {
+        ret["error"] = "can not clear exportedModuleInterfaces: $m"
+    }
+    return ret
 }

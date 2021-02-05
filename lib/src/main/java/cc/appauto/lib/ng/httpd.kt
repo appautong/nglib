@@ -7,8 +7,13 @@ import fi.iki.elonen.NanoHTTPD
 import java.io.File
 
 class Httpd internal constructor(val ctx: Context, val port: Int=8900): NanoHTTPD(port) {
-    private fun handleReset(session: IHTTPSession): JSONObject {
+    private fun handleResetJsRequire(session: IHTTPSession): JSONObject {
         return AppAutoContext.resetJavascriptRequire()
+    }
+
+    private fun handleResetJsGlobal(session: IHTTPSession): JSONObject {
+        AppAutoContext.resetJavascriptGlobal()
+        return JSONObject().also { it["result"] = "success" }
     }
 
     private fun handleExecJS(session: IHTTPSession): JSONObject {
@@ -29,7 +34,8 @@ class Httpd internal constructor(val ctx: Context, val port: Int=8900): NanoHTTP
 
         val ret = when(session.parms.get("method")) {
             "exec_js" -> handleExecJS(session)
-            "reset" -> handleReset(session)
+            "reset_jsrequire" -> handleResetJsRequire(session)
+            "reset_jsglobal" -> handleResetJsGlobal(session)
             else -> JSONObject().apply { this["error"] = "invalid or unsupported request: ${JSON.toJSONString(session.parameters)}" }
         }
 
