@@ -163,7 +163,6 @@ class AppAutoService: AccessibilityService() {
         super.onCreate()
 
         AppAutoContext.autoSrv = this
-        AppAutoContext.setupRuntime(this)
         Log.i(TAG, "$name: onCreate ${System.identityHashCode(this)}")
     }
 

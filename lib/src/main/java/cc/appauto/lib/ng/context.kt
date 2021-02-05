@@ -24,7 +24,11 @@ object AppAutoContext: Executor {
 
     // current accessibility service and notification listener service
     var autoSrv: AppAutoService? = null
-        internal set
+        internal set(value) {
+            field = value
+            if (value != null && !initialized) setupRuntime(value)
+        }
+
     var accessibilityConnected: Boolean = false
         internal set
 
@@ -66,9 +70,6 @@ object AppAutoContext: Executor {
     }
 
     internal fun setupRuntime(ctx: Context) {
-        // double check the flag
-        if (initialized) return
-
         submitTask {
             if (initialized) return@submitTask
 
@@ -102,11 +103,12 @@ object AppAutoContext: Executor {
 
     // dump the top app node recursively in appauto context's work thread
     fun dumpTopActiveApp() {
-        val s = autoSrv ?: return;
+        val s = autoSrv ?: return
         submitTask {
-            val ht = HierarchyTree.from(s) ?: return@submitTask
-            ht.print()
-            ht.recycle()
+            HierarchyTree.from(s)?.let {
+                it.print()
+                it.recycle()
+            }
         }
     }
 
@@ -115,7 +117,7 @@ object AppAutoContext: Executor {
 
 
     fun automatorOf(name: String = "NA"): AppAutomator? {
-        val s = autoSrv ?: return null;
+        val s = autoSrv ?: return null
         return AppAutomator(s, name)
     }
 
@@ -131,7 +133,7 @@ object AppAutoContext: Executor {
                 .setMessage(R.string.appauto_require_overlay_permission)
                 .setIcon(android.R.drawable.ic_dialog_alert)
                 .setPositiveButton(android.R.string.ok) { _, _ -> ctx.startActivity(intent) }
-                .setNegativeButton(android.R.string.cancel) { _,_ -> {}}
+                .setNegativeButton(android.R.string.cancel) { _,_ -> /* no-op */}
                 .show()
     }
 
@@ -147,7 +149,7 @@ object AppAutoContext: Executor {
                 .setMessage(R.string.appauto_require_accessibility_permission)
                 .setIcon(android.R.drawable.ic_dialog_alert)
                 .setPositiveButton(android.R.string.ok) { _, _ -> ctx.startActivity(intent) }
-                .setNegativeButton(android.R.string.cancel) { _,_ -> {}}
+                .setNegativeButton(android.R.string.cancel) { _,_ -> /* no-op */}
                 .show()
     }
 
@@ -157,10 +159,8 @@ object AppAutoContext: Executor {
 
     // execute task in appauto context's automation work thread and return the result
     fun<V> executeTask(c: Callable<V>): V {
-        if (inWorkThread) {
-            return c.call()
-        }
-        return FutureTask<V> { c.call() }.let {
+        if (inWorkThread) return c.call()
+        return FutureTask<V>(c::call).let {
             execute(it)
             it.get()
         }

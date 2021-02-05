@@ -75,8 +75,8 @@ class AutomationStep(val name: String, val automator: AppAutomator) {
                 break
             }
 
-            if (actionExecuted == retryCount) {
-                message = "failed after tried $actionExecuted times\ncontrols:\n${tree.hierarchyString}"
+            if (actionExecuted >= retryCount) {
+                message = "no matched expectation after tried $actionExecuted times\ncontrols:\n${tree.hierarchyString}"
                 tree.recycle()
                 break
             }
@@ -103,7 +103,9 @@ class AppAutomator(val srv: AccessibilityService, val name: String) {
     }
 
     companion object {
+        @JvmStatic
         var defaultRetryCount: Int = 3
+        @JvmStatic
         var defaultPostActDelay: Long = 1000
     }
 

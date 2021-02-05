@@ -26,7 +26,7 @@ enum class ClassName(val qualifiedName: String) {
     RelativeLayout(RelativeLayoutClassName),
     Linearlayout(LinearLayoutClassName),
     TextView(TextViewClassName),
-    EditTextClass(EditTextClassName),
+    EditText(EditTextClassName),
     Button(ButtonClassName),
     ImageView(ImageViewClassName),
     ImageButton(ImageButtonClassName),

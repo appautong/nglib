@@ -18,6 +18,8 @@ class HierarchyTree private constructor() {
     private var accessibilityNodes: MutableMap<String, AccessibilityNodeInfo> = mutableMapOf()
     private val accessibilityNodesKept: MutableSet<String> = mutableSetOf()
 
+    private var recycled = false
+
     // construct the hierarchy from given AccessibilityNodeInfo
     private fun setupHierarchy(node: AccessibilityNodeInfo, parent: HierarchyNode?): HierarchyNode {
         val hn = HierarchyNode(System.identityHashCode(node).toString())
@@ -28,6 +30,7 @@ class HierarchyTree private constructor() {
             hn.depth = parent.depth+1
         } else {
             hn.depth = 0
+            hn.siblingIndex = -node.windowId
         }
 
         hn.windowId = node.windowId
@@ -71,6 +74,7 @@ class HierarchyTree private constructor() {
             return tree
         }
 
+        @JvmOverloads
         fun from(srv: AccessibilityService, packageName: String? = null): HierarchyTree? {
             val root = getTopAppNode(srv, packageName) ?: return null
             return from(root)
@@ -78,15 +82,16 @@ class HierarchyTree private constructor() {
     }
 
     protected fun finalize() {
-        Log.v(TAG, "finalize called for: ${this.windowId}")
+        if (recycled) return
         recycle()
     }
 
-    // no operation shall be done with this tree object afeter recycle
+    // no operation shall be done with this tree object after recycle
+    @Synchronized
     fun recycle() {
-        Log.v(TAG, "recycle the hierarchy: ${this.windowId}")
-        this.root = null
+        if (recycled) return
 
+        this.root = null
         val tmp = this.accessibilityNodes
         this.accessibilityNodes = mutableMapOf()
 
@@ -99,6 +104,8 @@ class HierarchyTree private constructor() {
         }
         tmp.clear()
         accessibilityNodesKept.clear()
+
+        recycled = true
     }
 
     fun filter(predicate: (HierarchyNode)->Boolean): List<HierarchyNode> {
@@ -113,7 +120,7 @@ class HierarchyTree private constructor() {
             "null root node"
         else {
             val sb = StringBuilder()
-            root!!.walk { sb.appendLine(it.string()) }
+            root!!.walk { sb.appendLine(it.string) }
             sb.toString()
         }
 
@@ -126,19 +133,63 @@ class HierarchyTree private constructor() {
     fun getAccessibilityNodeInfo(node: HierarchyNode): AccessibilityNodeInfo? {
         return accessibilityNodes.get(node.id)
     }
+
+    /** return all nodes match the class name selectors as following:
+     *  descendant: A B
+     *  child: A > B
+     */
+    fun classNameSelector(selector: String): SelectionResult {
+        if (selector.isBlank()) return listOf<HierarchyNode>().toSelectionResult()
+
+        // convert selector string to parsed token list. e.g:
+        // "A  >  B  C >  D E >  F > G" =>
+        // [[A], [B, C], [D, E], [F], [G]]
+
+        // pcList: parent child relationship list
+        val pcList = mutableListOf<List<String>>()
+        val tmp = selector.split(">")
+        tmp.forEach {it.trim()}
+
+        var minDepth = -1
+        for (i in tmp.indices) {
+            var fields = tmp[i].split(" ")
+            fields = fields.filter { it.isNotBlank() }
+            pcList.add(fields)
+            minDepth += fields.size
+        }
+
+        // find all elements with given classname and depth >= minDepth
+        val cls = pcList.last().last()
+        val ret = this.filter {  it.depth >= minDepth && it.className == cls }
+
+        // construct the regexp string to match class hierarchy string
+        val regexpList: MutableList<String> = mutableListOf()
+        for (elem in pcList) {
+            regexpList.add(elem.joinToString(".*"))
+        }
+        val selectorRegexp = Regex(regexpList.joinToString(">"))
+
+        return ret.filter {
+            selectorRegexp.containsMatchIn(it.getClassHierarchyUpToRoot().joinToString(">"))
+        }.toSelectionResult()
+    }
 }
 
+
+// id: System.identityHashCode of the corresponding accessibility node
 class HierarchyNode(val id: String) {
     // depth level in the hierarchy tree, 0 for node without parent
     var depth: Int = -1
 
     var parent: HierarchyNode? = null
+        internal set
+
     var children: MutableList<HierarchyNode> =  mutableListOf()
 
     // siblings equals to parent.children
     var siblings: MutableList<HierarchyNode> = mutableListOf()
 
-    // this node's index in the sibling list; -1 for node without parent
+    // this node's index in the sibling list; negative for node without parent
     var siblingIndex: Int = -1
 
     var windowId: Int = -1
@@ -182,25 +233,26 @@ class HierarchyNode(val id: String) {
         return null
     }
 
-    fun string(indent: Boolean=false):String {
+    val stringIndent: String by lazy {
         val sb = StringBuilder()
-        if (indent) {
-            if (depth > 0) {
-                // if ancestor(i) is not the last element, '|' shall be drawn
-                for (i in this.depth-1 downTo 1) {
-                    val tmp = ancestor(i)!!
-                    if (!tmp.isLastInSibling) sb.append("|   ") else sb.append("    ")
-                }
-
-                // draw lines to current node
-                sb.append("|___")
+        if (depth > 0) {
+            // if ancestor(i) is not the last element, '|' shall be drawn
+            for (i in this.depth-1 downTo 1) {
+                val tmp = ancestor(i)!!
+                if (!tmp.isLastInSibling) sb.append("|   ") else sb.append("    ")
             }
+            // draw lines to current node
+            sb.append("|___")
         }
-        sb.append("$siblingIndex $viewId/${parent?.viewId} $className $text/$contentDescription v/c/e/s:$isVisibleToUser/$isClickable/$isEditable/$isScrollable ${bound?.toShortString()} ${children.size} w:$windowId id: $id")
-        return sb.toString()
+        sb.append(this.string)
+        sb.toString()
     }
 
-    fun print() = walk {  Log.i(TAG, it.string(true))}
+    val string: String by lazy {
+        "$hierarchyId $viewId/${parent?.viewId} $className $text/$contentDescription v/c/e/s:$isVisibleToUser/$isClickable/$isEditable/$isScrollable ${bound?.toShortString()} ${children.size}"
+    }
+
+    fun print() = walk {  Log.i(TAG, it.stringIndent)}
 
     // walk down the hierarchy to leaf node and call action each element (include the current node)
     fun walk(action: (HierarchyNode) -> Unit) {
@@ -210,7 +262,7 @@ class HierarchyNode(val id: String) {
         }
     }
 
-    // walk up the hierarchy to root(top) node and call predicate on each element (include the current node)
+    // walk up the hierarchy to root(top) node and call action on each element (include the current node)
     fun walkAncestors(action: (HierarchyNode) -> Unit) {
         action(this)
         var node = this.parent
@@ -220,6 +272,7 @@ class HierarchyNode(val id: String) {
         }
     }
 
+    // find at most n ancestor with the predicate f; find all if n <= 0
     fun findAncestor(predicate: (HierarchyNode) -> Boolean, n: Int = -1): List<HierarchyNode> {
         var found = 0
         val ret: MutableList<HierarchyNode> = mutableListOf()
@@ -253,6 +306,10 @@ class HierarchyNode(val id: String) {
         return ret
     }
 
+    val hierarchyId: String by lazy {
+        if (parent == null) "root:${windowId}" else "${parent!!.hierarchyId}-$siblingIndex"
+    }
+
     fun getClassHierarchyUpToRoot(): List<String>  {
        val ret: MutableList<String> = mutableListOf()
         this.walkAncestors { ret.add(0, it.className) }
@@ -269,4 +326,8 @@ class HierarchyNode(val id: String) {
         get() {
             return findAncestor({ it.isClickable }).firstOrNull()
         }
+
+    override fun toString(): String {
+        return this.string;
+    }
 }

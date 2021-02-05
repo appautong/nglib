@@ -35,6 +35,7 @@ fun openApp(srv: AccessibilityService?, ctx: Context, packageName: String, timeo
         sleep(interval)
         // retry open the app
         ctx.startActivity(intent)
+        now = System.currentTimeMillis()
     } while (now < deadline)
     return false
 }
