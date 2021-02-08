@@ -96,7 +96,7 @@ class AppAutomator(val srv: AccessibilityService, val name: String) {
     val steps: MutableList<AutomationStep> = mutableListOf()
 
     operator fun get(key: String): Any? {
-       return privateData.get(key)
+       return privateData[key]
     }
     operator fun set(key: String, value: Any) {
         privateData[key] = value

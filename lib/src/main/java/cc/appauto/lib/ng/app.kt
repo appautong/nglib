@@ -56,7 +56,7 @@ fun quitApp(service: AccessibilityService?, packageName: String, maxBackCount : 
     tmpNode?.recycle()
 
     if (backed == maxBackCount) {
-        Log.w(TAG, "backed ${backed} times without quit ${packageName}, press home")
+        Log.w(TAG, "backed $backed times without quit $packageName, press home")
         service.performGlobalAction(AccessibilityService.GLOBAL_ACTION_HOME)
     }
 }
@@ -72,7 +72,7 @@ fun getAppBound(srv: AccessibilityService?): Rect? {
     val ret = Rect()
 
     val wm = srv.getSystemService(Context.WINDOW_SERVICE) as WindowManager
-    var p = Point()
+    val p = Point()
     wm.defaultDisplay.getRealSize(p)
 
     ret.left = 0
@@ -81,7 +81,7 @@ fun getAppBound(srv: AccessibilityService?): Rect? {
     // enumerate the windows to exclude any top/bottom navigation bar
     srv.windows.forEach {
         if (it.type == AccessibilityWindowInfo.TYPE_SYSTEM && it.layer > 0) {
-            var r = Rect()
+            val r = Rect()
             it.getBoundsInScreen(r)
             if (r.top == 0) {
                 ret.top = r.bottom

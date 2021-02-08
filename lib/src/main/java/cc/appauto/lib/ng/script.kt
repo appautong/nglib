@@ -130,7 +130,7 @@ object JavascriptRuntime {
 
                 val s = scope ?: newScope(scopeGlobal)
                 val obj = ctx.evaluateString(s, content, "<evaluateJavaScript>", -1, null)
-                ret["result"] = org.mozilla.javascript.Context.toString(obj)
+                ret["result"] = Context.toString(obj)
             } catch (e: Exception) {
                 ret["error"] = "$name: execute script leads to exception: ${Log.getStackTraceString(e)}"
                 Log.e(TAG, ret.getString("error"))

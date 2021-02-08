@@ -59,7 +59,7 @@ fun AccessibilityService.scrollUpDown(isUp: Boolean, screenPercent: Float, durat
     }
 
     val wm = this.getSystemService(Context.WINDOW_SERVICE) as WindowManager
-    var p = Point()
+    val p = Point()
     wm.defaultDisplay.getSize(p)
     val height = p.y
     val width = p.x
@@ -111,7 +111,7 @@ fun AccessibilityService.click(x: Int, y: Int, times: Int = 1) {
 }
 
 fun getTopAppNode(srv: AccessibilityService?, packageName: String? = null): AccessibilityNodeInfo? {
-    if (srv == null) return null;
+    if (srv == null) return null
 
     var node: AccessibilityNodeInfo? = null
     var tried = 0

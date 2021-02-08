@@ -54,7 +54,7 @@ class Httpd internal constructor(val ctx: Context, val port: Int=8900): NanoHTTP
         // session.queryParameterString is the body content
         // session.parameters are the query parameters or post multipart form fields
 
-        val ret = when(session.parms.get("method")) {
+        val ret = when(session.parms["method"]) {
             "exec_js" -> handleExecJS(session)
             "reset_jsrequire" -> handleResetJsRequire(session)
             "reset_jsglobal" -> handleResetJsGlobal(session)

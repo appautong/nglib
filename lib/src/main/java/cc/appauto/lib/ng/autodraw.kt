@@ -58,7 +58,7 @@ object AutoDraw {
    val canDrawOverlay
       get() = initialized && Settings.canDrawOverlays(ctx)
 
-   // ready flag is set when the autodraw imagevie is added by window manager successfully
+   // ready flag is set when the autodraw imageview is added by window manager successfully
    // PS. in ready state, the user could still cancel the overlay draw permission, in
    // such cases, a warning message will be printed every time
    var ready: Boolean = false

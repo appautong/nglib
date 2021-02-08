@@ -9,14 +9,7 @@ import com.alibaba.fastjson.JSONObject
 
 fun AccessibilityNodeInfo.string(): String {
     val r = this.bound()
-    var parent: AccessibilityNodeInfo?
-
-    parent = try {
-        this.parent
-    } catch (e: Exception) {
-        Log.w(TAG, "AccessibilityNodeInfo.string: parent leads to exception: ${Log.getStackTraceString(e)}")
-        null
-    }
+    val parent = tryParent()
 
     val id = if (parent != null) "${this.windowId} ${this.viewID()} ${parent.viewID()}" else "${this.windowId} ${this.viewID()} null"
     return "$id ${this.className}, ${this.text}/${this.contentDescription}, v/c/e/s:${this.isVisibleToUser}/${this.isClickable}/${this.isEditable}/${this.isScrollable}, ${r.toShortString()}, ${this.childCount}"

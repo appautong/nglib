@@ -1,6 +1,6 @@
 package cc.appauto.lib.ng
 
-const val TAG = "appautong"
+const val TAG = "autong"
 
 const val WechatPackageName =  "com.tencent.mm"
 const val RelativeLayoutClassName = "android.widget.RelativeLayout"

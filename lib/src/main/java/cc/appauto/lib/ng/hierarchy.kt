@@ -23,7 +23,7 @@ class HierarchyTree private constructor() {
     // construct the hierarchy from given AccessibilityNodeInfo
     private fun setupHierarchy(node: AccessibilityNodeInfo, parent: HierarchyNode?): HierarchyNode {
         val hn = HierarchyNode(System.identityHashCode(node).toString())
-        accessibilityNodes.put(hn.id, node)
+        accessibilityNodes[hn.id] = node
 
         if (parent != null) {
             hn.parent = parent
@@ -131,7 +131,7 @@ class HierarchyTree private constructor() {
 
     // AccessibilityNodeInfo shall be not recycled manually, invoke HierarchyTree.recycle instead
     fun getAccessibilityNodeInfo(node: HierarchyNode): AccessibilityNodeInfo? {
-        return accessibilityNodes.get(node.id)
+        return accessibilityNodes[node.id]
     }
 
     /** return all nodes match the class name selectors as following:
@@ -328,6 +328,6 @@ class HierarchyNode(val id: String) {
         }
 
     override fun toString(): String {
-        return this.string;
+        return this.string
     }
 }
