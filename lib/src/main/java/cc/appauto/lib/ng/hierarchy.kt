@@ -47,6 +47,12 @@ class HierarchyTree private constructor() {
         hn.isScrollable = node.isScrollable
         hn.isEditable = node.isEditable
 
+        // do not go further if current depth > maxHierarchyDepth
+        if (hn.depth > maxHierarchyDepth && node.childCount > 0) {
+            Log.w(TAG, "setupHierarchy: reached maximum depth ${hn.depth} for ${node.string()}, skip setup further children")
+            return hn
+        }
+
         // setup hierarchy information
         for (idx in 0 until node.childCount) {
             val nodeChild = node.tryGetChild(idx)
@@ -65,6 +71,10 @@ class HierarchyTree private constructor() {
     }
 
     companion object {
+        // maximum hierarchy node depth
+        @JvmField
+        var maxHierarchyDepth: Int =  20
+
         // do not recycle the root node, HierarchyTree.recycle would recycle it
         fun from(root: AccessibilityNodeInfo): HierarchyTree {
             val tree = HierarchyTree()
