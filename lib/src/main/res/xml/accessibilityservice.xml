@@ -3,5 +3,6 @@
     android:canRetrieveWindowContent="true"
     android:canRequestEnhancedWebAccessibility="true"
     android:canPerformGestures="true"
+    android:canTakeScreenshot="true"
     android:canRequestTouchExplorationMode="true"
 />
