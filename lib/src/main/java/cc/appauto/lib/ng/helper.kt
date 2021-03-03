@@ -2,6 +2,8 @@ package cc.appauto.lib.ng
 
 import android.graphics.Rect
 import android.util.Log
+import java.text.SimpleDateFormat
+import java.util.*
 import kotlin.random.Random
 
 private val r: Random = Random(System.currentTimeMillis())
@@ -73,4 +75,13 @@ fun randomInt(min: Int, max: Int) : Int {
 
 fun randomFloat(): Float {
     return r.nextFloat()
+}
+
+// get current date string with given format. e.g.: 2016_03_04_11_23_45
+// the default format is 'yyyy_MM_dd_HH_mm_ss
+@JvmOverloads
+fun getDateStr(format: String = "yyyy_MM_dd_HH_mm_ss"): String {
+    val df = SimpleDateFormat(format, Locale.US)
+    val c = GregorianCalendar(Locale.CHINA)
+    return df.format(c.time)
 }

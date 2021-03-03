@@ -1,5 +1,6 @@
 package cc.appauto.lib.ng
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.*
 import android.os.Build
@@ -54,6 +55,7 @@ class AutoDrawView @JvmOverloads constructor (ctx: Context, attrs: AttributeSet?
    }
 }
 
+@SuppressLint("StaticFieldLeak")
 object AutoDraw {
    val canDrawOverlay
       get() = initialized && Settings.canDrawOverlays(ctx)

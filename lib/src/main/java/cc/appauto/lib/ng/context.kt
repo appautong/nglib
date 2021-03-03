@@ -1,5 +1,6 @@
 package cc.appauto.lib.ng
 
+import android.annotation.SuppressLint
 import android.app.Activity
 import android.app.AlertDialog
 import android.app.NotificationManager
@@ -17,6 +18,7 @@ import java.util.concurrent.Callable
 import java.util.concurrent.Executor
 import java.util.concurrent.FutureTask
 
+@SuppressLint("StaticFieldLeak")
 object AppAutoContext: Executor {
     internal const val name = "autoctx"
 
@@ -64,6 +66,9 @@ object AppAutoContext: Executor {
     // autodraw runtime
     val autodraw = AutoDraw
 
+    // media runtime
+    val automedia = MediaRuntime
+
     init {
         workThread.start()
         workHandler = Handler(workThread.looper)
@@ -90,6 +95,7 @@ object AppAutoContext: Executor {
 
             jsRuntime.setup(appContext)
             autodraw.setup(appContext)
+            automedia.setup(appContext)
 
             initialized = true
             Log.i(TAG, "$name: setup runtime successfully")

@@ -27,6 +27,9 @@ class ExampleUnitTest {
         c.add(Calendar.DATE, -28)
         val df = SimpleDateFormat("yyyy-MM-dd", Locale.US)
         println(df.format(c.time))
+
+        val df2 = SimpleDateFormat("yyyy_MM_dd_HH_mm_ss", Locale.US)
+        println(df2.format(c.time))
     }
 
     @Test
