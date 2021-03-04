@@ -7,4 +7,8 @@
     <string name="appauto_require_permission">require permission</string>
     <string name="appauto_require_overlay_permission">draw on overlay permission is required</string>
     <string name="appauto_require_accessibility_permission">accessibility permission is required</string>
+    <string name="appauto_media_service_name">autong media projection service</string>
+    <string name="appauto_media_service_notification_title">screen recording</string>
+    <string name="appauto_media_service_notification_content">screen is recording...</string>
+    <string name="appauto_media_service_default_notification_channel_name">appauto media service default notification channel</string>
 </resources>

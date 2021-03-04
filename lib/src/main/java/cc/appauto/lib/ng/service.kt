@@ -3,9 +3,19 @@ package cc.appauto.lib.ng
 import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.AccessibilityServiceInfo
 import android.accessibilityservice.GestureDescription
+import android.app.Activity
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.Service
 import android.content.Context
+import android.content.Intent
 import android.graphics.Path
 import android.graphics.Point
+import android.media.projection.MediaProjection
+import android.os.Binder
+import android.os.Build
+import android.os.IBinder
+import android.os.Parcel
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import android.util.Log
@@ -13,6 +23,8 @@ import android.view.WindowManager
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import android.view.accessibility.AccessibilityWindowInfo
+import androidx.core.app.NotificationCompat
+import cc.appauto.lib.R
 
 fun AccessibilityService?.getHierarchyString(): String {
     if (this == null) return "null accessibility service"
@@ -157,8 +169,8 @@ fun getInputIMEWindow(srv: AccessibilityService?) : AccessibilityWindowInfo? {
     }
 }
 
-class AppAutoService: AccessibilityService() {
-    private val name = "appauto_service"
+class AppAutoAccessibilityService: AccessibilityService() {
+    private val name = "appauto_accessibility_service"
     override fun onCreate() {
         super.onCreate()
 
@@ -214,5 +226,63 @@ class AppAutoNotificationService: NotificationListenerService() {
     override fun onListenerDisconnected() {
         Log.i(TAG, "$name: on listener disconnected ${System.identityHashCode(this)}")
         AppAutoContext.listenerConnected = false
+    }
+}
+
+class AppAutoMediaService: Service() {
+    private val name = "appauto_media_service"
+    private val channelId = "default channel"
+    private var mediaProjection: MediaProjection? = null
+
+    val foregroundNotificatioinId = 1
+
+    override fun onBind(intent: Intent?): IBinder? {
+        return null
+    }
+
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        Log.i(TAG, "$name: onStartCommand(${System.identityHashCode(this)}): $intent $flags $startId")
+        if (intent == null) {
+            Log.w(TAG, "$name: onStartCommand with null intent, skipping...")
+            stopSelf(startId)
+            return START_NOT_STICKY
+        }
+        if (!intent.hasExtra("resultCode") || !intent.hasExtra("data")) {
+            Log.w(TAG, "$name: onStartCommand with invalid intent, missing mandatory fields: resultCode and data, skipping...")
+            stopSelf(startId)
+            return START_NOT_STICKY
+        }
+        val resultCode = intent.getIntExtra("resultCode", Activity.RESULT_CANCELED)
+        val data = intent.getParcelableExtra<Intent>("data")
+        if (resultCode != Activity.RESULT_OK || data == null) {
+            Log.w(TAG, "$name: onStartCommand with invalid resultCode: $resultCode and data: $data, skipping...")
+            stopSelf(startId)
+            return START_NOT_STICKY
+        }
+
+        val noti = NotificationCompat.Builder(this, channelId)
+            .setSmallIcon(android.R.mipmap.sym_def_app_icon)
+            .setContentTitle(getString(R.string.appauto_media_service_notification_title))
+            .setContentText(getString(R.string.appauto_media_service_notification_content))
+            .build()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(channelId, getString(R.string.appauto_media_service_default_notification_channel_name), NotificationManager.IMPORTANCE_DEFAULT)
+            AppAutoContext.notificationMgr.createNotificationChannel(channel)
+        }
+
+        // start foreground before acquiring the media projection as it requires foreground service context
+        startForeground(foregroundNotificatioinId, noti)
+        mediaProjection = AppAutoContext.mediaProjectionManager.getMediaProjection(resultCode, data)
+        Log.i(TAG, "$name: onStartCommand, acquired media projection: $mediaProjection")
+
+        return START_NOT_STICKY
+    }
+
+    override fun onCreate() {
+        Log.i(TAG, "$name: onCreate(${System.identityHashCode(this)})")
+    }
+
+    override fun onDestroy() {
+        Log.i(TAG, "$name: onDestroy(${System.identityHashCode(this)})")
     }
 }

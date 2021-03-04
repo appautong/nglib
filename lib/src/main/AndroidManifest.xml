@@ -4,10 +4,11 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
 
     <application>
         <service
-            android:name=".ng.AppAutoService"
+            android:name=".ng.AppAutoAccessibilityService"
             android:label="@string/appauto_service_name"
             android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
             <intent-filter>
@@ -25,6 +26,11 @@
             <intent-filter>
                 <action android:name="android.service.notification.NotificationListenerService"/>
             </intent-filter>
+        </service>
+        <service
+            android:name=".ng.AppAutoMediaService"
+            android:label="@string/appauto_media_service_name"
+            android:foregroundServiceType="mediaProjection">
         </service>
     </application>
 </manifest>

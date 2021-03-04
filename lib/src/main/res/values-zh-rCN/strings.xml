@@ -7,4 +7,8 @@
     <string name="appauto_require_permission">授予权限</string>
     <string name="appauto_require_overlay_permission">需要overlay绘图权限</string>
     <string name="appauto_require_accessibility_permission">需要辅助服务权限</string>
+    <string name="appauto_media_service_name">autong媒体投射服务</string>
+    <string name="appauto_media_service_notification_title">屏幕录制</string>
+    <string name="appauto_media_service_notification_content">屏幕录制中...</string>
+    <string name="appauto_media_service_default_notification_channel_name">autong媒体服务默认通知通道</string>
 </resources>

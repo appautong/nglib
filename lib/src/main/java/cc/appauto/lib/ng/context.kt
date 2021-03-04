@@ -7,12 +7,14 @@ import android.app.NotificationManager
 import android.content.Context
 import android.content.Intent
 import android.content.res.AssetManager
+import android.media.projection.MediaProjectionManager
 import android.os.Handler
 import android.os.HandlerThread
 import android.provider.Settings
 import android.util.Log
 import android.view.WindowManager
 import android.view.accessibility.AccessibilityManager
+import androidx.appcompat.app.AppCompatActivity
 import cc.appauto.lib.R
 import java.util.concurrent.Callable
 import java.util.concurrent.Executor
@@ -25,12 +27,8 @@ object AppAutoContext: Executor {
     const val ERR_NOT_READY = "appauto context not ready: accessibility service is not connected yet"
 
     // current accessibility service and notification listener service
-    var autoSrv: AppAutoService? = null
-        internal set(value) {
-            field = value
-            if (value != null && !initialized) setupRuntime(value)
-        }
-
+    var autoSrv: AppAutoAccessibilityService? = null
+        internal set
     var accessibilityConnected: Boolean = false
         internal set
 
@@ -41,6 +39,7 @@ object AppAutoContext: Executor {
 
     // android application context
     internal lateinit var appContext: Context
+    internal var currentActivity: AppCompatActivity? = null
 
     // flag indicates that whether all the underline runtime of appauto context is initialized
     // set when setupRuntime invoked after accessibility service is connected at the first time
@@ -50,6 +49,8 @@ object AppAutoContext: Executor {
     internal lateinit var notificationMgr: NotificationManager
     internal lateinit var windowManager: WindowManager
     internal lateinit var assetManager: AssetManager
+    internal lateinit var mediaProjectionManager: MediaProjectionManager
+
     internal lateinit var httpd: Httpd
         private set
     internal lateinit var httpClient: HttpClient
@@ -74,32 +75,38 @@ object AppAutoContext: Executor {
         workHandler = Handler(workThread.looper)
     }
 
-    internal fun setupRuntime(ctx: Context) {
-        submitTask {
-            if (initialized) return@submitTask
-
-            appContext = ctx.applicationContext
-            accessibilityMgr = appContext.getSystemService(Context.ACCESSIBILITY_SERVICE) as AccessibilityManager
-            notificationMgr = appContext.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-            windowManager = appContext.getSystemService(Context.WINDOW_SERVICE) as WindowManager
-            assetManager = appContext.assets
-
-            accessibilityMgr.addAccessibilityStateChangeListener {
-                workHandler.postAtFrontOfQueue { onStateChange(it) }
-            }
-
-
-            httpClient = HttpClient(appContext)
-            httpd = Httpd(appContext)
-            httpd.start()
-
-            jsRuntime.setup(appContext)
-            autodraw.setup(appContext)
-            automedia.setup(appContext)
-
-            initialized = true
-            Log.i(TAG, "$name: setup runtime successfully")
+    @Synchronized
+    fun setupRuntime(activity: AppCompatActivity) {
+        if (initialized) {
+            return
         }
+
+        currentActivity = activity
+        val ctx = activity.applicationContext
+
+        appContext = ctx.applicationContext
+        accessibilityMgr = appContext.getSystemService(AccessibilityManager::class.java)
+        notificationMgr = appContext.getSystemService(NotificationManager::class.java)
+        windowManager = appContext.getSystemService(WindowManager::class.java)
+        assetManager = appContext.assets
+        mediaProjectionManager = appContext.getSystemService(MediaProjectionManager::class.java)
+
+        accessibilityMgr.addAccessibilityStateChangeListener {
+            workHandler.postAtFrontOfQueue { onStateChange(it) }
+        }
+
+
+        httpClient = HttpClient(appContext)
+        httpd = Httpd(appContext)
+        httpd.start()
+
+        jsRuntime.setup(appContext)
+        autodraw.setup(appContext)
+
+        automedia.setup(activity)
+
+        initialized = true
+        Log.i(TAG, "$name: setup runtime successfully")
     }
 
     private fun onStateChange(enabled: Boolean) {
