@@ -7,8 +7,7 @@ import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.PixelFormat
 import android.media.ImageReader
-import android.os.Handler
-import android.os.HandlerThread
+import android.os.Looper
 import android.util.Base64
 import android.util.DisplayMetrics
 import android.util.Log
@@ -37,6 +36,8 @@ object MediaRuntime {
     private var screenshots: MutableList<String> = mutableListOf()
     private var maxScreenshotCount = 5
 
+    private var requestFinishMutex = Object()
+    private var requestStatus: Int = -1
     private var initialized: Boolean = false
 
     private fun prepareMediaRequestLauncher(activity: AppCompatActivity) {
@@ -48,9 +49,14 @@ object MediaRuntime {
                 intent.putExtra("resultCode", it.resultCode)
                 intent.putExtra("surface", imageReader.surface)
                 ctx.startService(intent)
+                requestStatus = 1
             }
             else {
                 Log.w(TAG, "$name: request media projection denied by user, result code: ${it.resultCode}")
+                requestStatus = 0
+            }
+            synchronized(requestFinishMutex) {
+                requestFinishMutex.notify()
             }
         }
     }
@@ -75,9 +81,28 @@ object MediaRuntime {
         Log.i(TAG, "$name: initialized")
     }
 
-    fun requestMediaProjection(): Boolean {
+    /**
+     * requestMediaProjection must not be called in main thread, otherwise, it will
+     * block the main thread infinitely or at least the given timeout. Because the
+     * request result callback will run in the main thread, and, if the function runs
+     * in main thread, the "wait" operation below will block the main thread to "wait"
+     * the notification in request result callback, OOPs...
+     * @param timeout wait given timeout in unit of milli-second (0 means infinitely)
+     * @return -2: can not call this function in main thread; -1 timeout; 0: user denied; 1: user approved
+     */
+    @Synchronized
+    @JvmOverloads
+    fun requestMediaProjection(timeout: Long = 0): Int {
+        if (Looper.getMainLooper().isCurrentThread) return -2
+
+        requestStatus = -1
+        val ms = if(timeout < 0)  0 else timeout
+
         requestLauncher.launch(AppAutoContext.mediaProjectionManager.createScreenCaptureIntent())
-        return true
+        synchronized(requestFinishMutex) {
+            requestFinishMutex.wait(ms)
+        }
+        return requestStatus
     }
 
 
