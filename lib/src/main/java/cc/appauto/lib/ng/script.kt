@@ -31,7 +31,7 @@ object JavascriptRuntime {
     internal fun setup(appContext: android.content.Context) {
         if (initialized) return
 
-        AppAutoContext.submitTask {
+        AppAutoContext.executor.submitTask {
             if (initialized) return@submitTask
             initialized = true
 
@@ -124,7 +124,7 @@ object JavascriptRuntime {
             Log.e(TAG, "$name: $log")
             return JSONObject().also { it["error"] = log }
         }
-        return AppAutoContext.executeTask {
+        return AppAutoContext.executor.executeTask {
             val ret = JSONObject()
             try {
 

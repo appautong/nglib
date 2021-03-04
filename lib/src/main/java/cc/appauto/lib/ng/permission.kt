@@ -15,11 +15,11 @@ fun AppAutoContext.checkPermissions(activity: AppCompatActivity): Boolean {
         .create()
     diag.show()
 
-    workHandler.postDelayed({
+    executor.workHandler.postDelayed({
         diag.dismiss()
     }, 2000)
 
-    return executeTask {
+    return executor.executeTask {
         when {
             !accessibilityConnected -> {
                 openAccessibilitySetting(activity)

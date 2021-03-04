@@ -317,7 +317,7 @@ class AppAutoMediaService: Service() {
             null,
             null
         )
-        MediaRuntime.imageReader.setOnImageAvailableListener({ MediaRuntime.onImageAvailable(it) }, MediaRuntime.mediaHandler)
+        MediaRuntime.imageReader.setOnImageAvailableListener({ MediaRuntime.onImageAvailable(it) }, MediaRuntime.executor.workHandler)
     }
 
     override fun onCreate() {

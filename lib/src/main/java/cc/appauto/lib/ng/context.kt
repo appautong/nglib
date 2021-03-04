@@ -8,20 +8,15 @@ import android.content.Context
 import android.content.Intent
 import android.content.res.AssetManager
 import android.media.projection.MediaProjectionManager
-import android.os.Handler
-import android.os.HandlerThread
 import android.provider.Settings
 import android.util.Log
 import android.view.WindowManager
 import android.view.accessibility.AccessibilityManager
 import androidx.appcompat.app.AppCompatActivity
 import cc.appauto.lib.R
-import java.util.concurrent.Callable
-import java.util.concurrent.Executor
-import java.util.concurrent.FutureTask
 
 @SuppressLint("StaticFieldLeak")
-object AppAutoContext: Executor {
+object AppAutoContext {
     internal const val name = "autoctx"
 
     const val ERR_NOT_READY = "appauto context not ready: accessibility service is not connected yet"
@@ -56,9 +51,7 @@ object AppAutoContext: Executor {
         private set
 
     // separate thread/handler to run the automation javascript
-    private var workThread: HandlerThread = HandlerThread("${TAG}_${name}_thread")
-    var workHandler: Handler
-        private set
+    var executor = HandlerExecutor("${TAG}_$name")
 
     // javascript runtime related
     val jsRuntime = JavascriptRuntime
@@ -68,11 +61,6 @@ object AppAutoContext: Executor {
 
     // media runtime
     val mediaRuntime = MediaRuntime
-
-    init {
-        workThread.start()
-        workHandler = Handler(workThread.looper)
-    }
 
     // setupRuntime shall be called in onCreate
     @Synchronized
@@ -85,7 +73,7 @@ object AppAutoContext: Executor {
             return
         }
 
-        // things dependend on application context will only be initialized once
+        // things depend on application context will only be initialized once
         val ctx = activity.applicationContext
 
         appContext = ctx.applicationContext
@@ -96,7 +84,7 @@ object AppAutoContext: Executor {
         mediaProjectionManager = appContext.getSystemService(MediaProjectionManager::class.java)
 
         accessibilityMgr.addAccessibilityStateChangeListener {
-            workHandler.postAtFrontOfQueue { onStateChange(it) }
+            executor.workHandler.postAtFrontOfQueue { onStateChange(it) }
         }
 
 
@@ -121,7 +109,7 @@ object AppAutoContext: Executor {
     // dump the top app node recursively in appauto context's work thread
     fun dumpTopActiveApp() {
         val s = autoSrv ?: return
-        submitTask {
+        executor.submitTask {
             HierarchyTree.from(s)?.let {
                 it.print()
                 it.recycle()
@@ -168,29 +156,5 @@ object AppAutoContext: Executor {
                 .setPositiveButton(android.R.string.ok) { _, _ -> ctx.startActivity(intent) }
                 .setNegativeButton(android.R.string.cancel) { _,_ -> /* no-op */}
                 .show()
-    }
-
-
-    private val inWorkThread: Boolean
-        get() = android.os.Process.myTid() == workThread.threadId
-
-    // execute task in appauto context's automation work thread and return the result
-    fun<V> executeTask(c: Callable<V>): V {
-        if (inWorkThread) return c.call()
-        return FutureTask<V>(c::call).let {
-            execute(it)
-            it.get()
-        }
-    }
-
-    // submit the work in appauto context's automation work thread and return
-    // if current thread is already work thread, execute the runnable immediately
-    fun submitTask(r: Runnable) {
-        if (inWorkThread) r.run()
-        else workHandler.post(r)
-    }
-
-    override fun execute(command: Runnable?) {
-        command?.let { submitTask(command) }
     }
 }

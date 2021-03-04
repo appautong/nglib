@@ -1,9 +1,14 @@
 package cc.appauto.lib.ng
 
 import android.graphics.Rect
+import android.os.Handler
+import android.os.HandlerThread
 import android.util.Log
 import java.text.SimpleDateFormat
 import java.util.*
+import java.util.concurrent.Callable
+import java.util.concurrent.Executor
+import java.util.concurrent.FutureTask
 import kotlin.random.Random
 
 private val r: Random = Random(System.currentTimeMillis())
@@ -84,4 +89,37 @@ fun getDateStr(format: String = "yyyy_MM_dd_HH_mm_ss"): String {
     val df = SimpleDateFormat(format, Locale.US)
     val c = GregorianCalendar(Locale.CHINA)
     return df.format(c.time)
+}
+
+class HandlerExecutor (val name: String): Executor {
+    val workThread: HandlerThread = HandlerThread(name)
+    val workHandler: Handler
+
+    init {
+        workThread.start()
+        workHandler = Handler(workThread.looper)
+    }
+
+    private val inWorkThread: Boolean
+        get() = android.os.Process.myTid() == workThread.threadId
+
+    // execute task in work thread and return the result
+    fun<V> executeTask(c: Callable<V>): V {
+        if (inWorkThread) return c.call()
+        return FutureTask<V>(c::call).let {
+            execute(it)
+            it.get()
+        }
+    }
+
+    // submit the runnable in work thread and return.
+    // if it is already in work thread, execute the runnable immediately
+    fun submitTask(r: Runnable) {
+        if (inWorkThread) r.run()
+        else workHandler.post(r)
+    }
+
+    override fun execute(command: Runnable?) {
+        command?.let { submitTask(command) }
+    }
 }

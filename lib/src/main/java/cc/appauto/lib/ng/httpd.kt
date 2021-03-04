@@ -17,10 +17,10 @@ class Httpd internal constructor(val ctx: Context, val port: Int=8900): NanoHTTP
 
     private fun handleResetJsGlobal(session: IHTTPSession): JSONObject {
         if (!AppAutoContext.initialized) return JSONObject().also { it["error"] = AppAutoContext.ERR_NOT_READY }
-        val js = session.parms["file"]
+        val js = session.parameters["file"]?.firstOrNull()
         if (js.isNullOrEmpty()) return JSONObject().also { it["error"] = "parameter file is required"}
 
-        return AppAutoContext.executeTask {
+        return AppAutoContext.executor.executeTask {
             val jsRuntime = AppAutoContext.jsRuntime
             val scope = jsRuntime.ctx.initStandardObjects(null, true)
             val require = jsRuntime.installRequire(scope, JavascriptRuntime.requireBuilder)
@@ -36,8 +36,16 @@ class Httpd internal constructor(val ctx: Context, val port: Int=8900): NanoHTTP
 
     }
 
+    private fun handleGetScreenshot(session: IHTTPSession): String {
+        val ret = AppAutoContext.mediaRuntime.getScreenShot()
+        if (ret.containsKey("error")) return ret.getString("error")
+
+        val data = ret.getString("result")
+        return "<html><body><img src='data:image/jpeg;base64,$data'/></body></html>"
+    }
+
     private fun handleExecJS(session: IHTTPSession): JSONObject {
-        val js = session.parms["file"]
+        val js = session.parameters["file"]?.firstOrNull()
         val ret = JSONObject()
         if (js.isNullOrEmpty()) {
             ret["error"] = "parameter file is required"
@@ -54,7 +62,19 @@ class Httpd internal constructor(val ctx: Context, val port: Int=8900): NanoHTTP
         // session.queryParameterString is the body content
         // session.parameters are the query parameters or post multipart form fields
 
-        val ret = when(session.parms["method"]) {
+        if (session.method == Method.GET) {
+            val data = when(session.uri) {
+                "/screenshot" -> handleGetScreenshot(session)
+                else -> "unsupported path: ${session.uri}"
+            }
+            return newFixedLengthResponse(data).also {
+                if (it.getHeader("Content-Type").isNullOrEmpty()) {
+                    it.addHeader("Content-Type", "text/html; charset=utf-8")
+                }
+            }
+        }
+
+        val ret = when(session.parameters["method"]?.firstOrNull()) {
             "exec_js" -> handleExecJS(session)
             "reset_jsrequire" -> handleResetJsRequire(session)
             "reset_jsglobal" -> handleResetJsGlobal(session)
