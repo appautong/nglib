@@ -11,14 +11,15 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.Path
 import android.graphics.Point
+import android.hardware.display.DisplayManager
+import android.hardware.display.VirtualDisplay
 import android.media.projection.MediaProjection
-import android.os.Binder
 import android.os.Build
 import android.os.IBinder
-import android.os.Parcel
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import android.util.Log
+import android.view.Surface
 import android.view.WindowManager
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
@@ -233,6 +234,8 @@ class AppAutoMediaService: Service() {
     private val name = "appauto_media_service"
     private val channelId = "default channel"
     private var mediaProjection: MediaProjection? = null
+    private var surface: Surface? = null
+    private var display: VirtualDisplay? = null
 
     val foregroundNotificatioinId = 1
 
@@ -247,15 +250,17 @@ class AppAutoMediaService: Service() {
             stopSelf(startId)
             return START_NOT_STICKY
         }
-        if (!intent.hasExtra("resultCode") || !intent.hasExtra("data")) {
-            Log.w(TAG, "$name: onStartCommand with invalid intent, missing mandatory fields: resultCode and data, skipping...")
+        if (!intent.hasExtra("resultCode") || !intent.hasExtra("data") || !intent.hasExtra("surface")) {
+            Log.w(TAG, "$name: onStartCommand with invalid intent, missing mandatory fields: resultCode, data or surface, skipping...")
             stopSelf(startId)
             return START_NOT_STICKY
         }
         val resultCode = intent.getIntExtra("resultCode", Activity.RESULT_CANCELED)
         val data = intent.getParcelableExtra<Intent>("data")
-        if (resultCode != Activity.RESULT_OK || data == null) {
-            Log.w(TAG, "$name: onStartCommand with invalid resultCode: $resultCode and data: $data, skipping...")
+        surface = intent.getParcelableExtra("surface")
+
+        if (resultCode != Activity.RESULT_OK || data == null || surface == null) {
+            Log.w(TAG, "$name: onStartCommand with invalid intent, resultCode: $resultCode, data: $data, surface: $surface skipping...")
             stopSelf(startId)
             return START_NOT_STICKY
         }
@@ -272,10 +277,47 @@ class AppAutoMediaService: Service() {
 
         // start foreground before acquiring the media projection as it requires foreground service context
         startForeground(foregroundNotificatioinId, noti)
+        if (mediaProjection != null) stopMediaProjection()
+
         mediaProjection = AppAutoContext.mediaProjectionManager.getMediaProjection(resultCode, data)
         Log.i(TAG, "$name: onStartCommand, acquired media projection: $mediaProjection")
 
+        if (mediaProjection != null) {
+            startMediaProjection()
+        }
         return START_NOT_STICKY
+    }
+
+    fun pauseMediaProjection() {
+        display?.surface = null
+    }
+
+    fun resumeMediaProjection() {
+        Log.i(TAG, "$name: resume media projection")
+        display?.surface = surface
+    }
+
+    fun stopMediaProjection() {
+        Log.i(TAG, "$name: stop media projection")
+        pauseMediaProjection()
+        display?.release()
+        display = null
+        MediaRuntime.imageReader.setOnImageAvailableListener(null, null)
+    }
+
+    fun startMediaProjection() {
+        Log.i(TAG, "$name: start media projection")
+        display = mediaProjection?.createVirtualDisplay(
+            "screenshot",
+            MediaRuntime.displayMetrics.widthPixels,
+            MediaRuntime.displayMetrics.heightPixels,
+            MediaRuntime.displayMetrics.densityDpi,
+            DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
+            MediaRuntime.imageReader.surface,
+            null,
+            null
+        )
+        MediaRuntime.imageReader.setOnImageAvailableListener({ MediaRuntime.onImageAvailable(it) }, MediaRuntime.mediaHandler)
     }
 
     override fun onCreate() {

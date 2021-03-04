@@ -42,7 +42,6 @@ object AppAutoContext: Executor {
     internal var currentActivity: AppCompatActivity? = null
 
     // flag indicates that whether all the underline runtime of appauto context is initialized
-    // set when setupRuntime invoked after accessibility service is connected at the first time
     internal var initialized = false
 
     internal lateinit var accessibilityMgr: AccessibilityManager
@@ -68,20 +67,25 @@ object AppAutoContext: Executor {
     val autodraw = AutoDraw
 
     // media runtime
-    val automedia = MediaRuntime
+    val mediaRuntime = MediaRuntime
 
     init {
         workThread.start()
         workHandler = Handler(workThread.looper)
     }
 
+    // setupRuntime shall be called in onCreate
     @Synchronized
     fun setupRuntime(activity: AppCompatActivity) {
+        currentActivity = activity
+
+        // if setupRuntime invoked again after initialized, only update things dependent on activity
         if (initialized) {
+            mediaRuntime.setup(activity)
             return
         }
 
-        currentActivity = activity
+        // things dependend on application context will only be initialized once
         val ctx = activity.applicationContext
 
         appContext = ctx.applicationContext
@@ -103,7 +107,7 @@ object AppAutoContext: Executor {
         jsRuntime.setup(appContext)
         autodraw.setup(appContext)
 
-        automedia.setup(activity)
+        mediaRuntime.setup(activity)
 
         initialized = true
         Log.i(TAG, "$name: setup runtime successfully")
@@ -126,7 +130,7 @@ object AppAutoContext: Executor {
     }
 
     val topAppHierarchyString
-        get() = if (!initialized) ERR_NOT_READY else autoSrv.getHierarchyString()
+        get() = if (!accessibilityConnected) ERR_NOT_READY else autoSrv.getHierarchyString()
 
 
     fun automatorOf(name: String = "NA"): AppAutomator? {

@@ -1,17 +1,32 @@
 package cc.appauto.lib.ng
 
-import android.content.Context
+import android.app.AlertDialog
 import android.provider.Settings
+import androidx.appcompat.app.AppCompatActivity
+import cc.appauto.lib.R
 
-fun AppAutoContext.checkPermissions(ctx: Context): Boolean {
+fun AppAutoContext.checkPermissions(activity: AppCompatActivity): Boolean {
+    if (accessibilityConnected && Settings.canDrawOverlays(activity)) return true
+
+    val builder = AlertDialog.Builder(activity)
+    val diag = builder.setTitle(R.string.appauto_check_permission)
+        .setIcon(android.R.drawable.ic_dialog_alert)
+        .setCancelable(false)
+        .create()
+    diag.show()
+
+    workHandler.postDelayed({
+        diag.dismiss()
+    }, 2000)
+
     return executeTask {
         when {
-            !initialized -> {
-                openAccessibilitySetting(ctx)
+            !accessibilityConnected -> {
+                openAccessibilitySetting(activity)
                 false
             }
-            !Settings.canDrawOverlays(ctx) -> {
-                openOverlayPermissionSetting(ctx)
+            !Settings.canDrawOverlays(activity) -> {
+                openOverlayPermissionSetting(activity)
                 false
             }
             else -> true
