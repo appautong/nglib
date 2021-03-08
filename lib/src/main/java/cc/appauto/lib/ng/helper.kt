@@ -4,6 +4,8 @@ import android.graphics.Rect
 import android.os.Handler
 import android.os.HandlerThread
 import android.util.Log
+import kotlinx.coroutines.*
+import java.lang.Runnable
 import java.text.SimpleDateFormat
 import java.util.*
 import java.util.concurrent.Callable
@@ -94,10 +96,14 @@ fun getDateStr(format: String = "yyyy_MM_dd_HH_mm_ss"): String {
 class HandlerExecutor (val name: String): Executor {
     val workThread: HandlerThread = HandlerThread(name)
     val workHandler: Handler
+    val dispatcher: CoroutineDispatcher
+    val scope: CoroutineScope
 
     init {
         workThread.start()
         workHandler = Handler(workThread.looper)
+        dispatcher = this.asCoroutineDispatcher()
+        scope = GlobalScope + dispatcher
     }
 
     private val inWorkThread: Boolean

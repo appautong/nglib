@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.PixelFormat
+import android.media.Image
 import android.media.ImageReader
 import android.os.Looper
 import android.util.Base64
@@ -15,7 +16,16 @@ import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import com.alibaba.fastjson.JSONObject
+import kotlinx.coroutines.*
+import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.*
 import java.io.ByteArrayOutputStream
+import kotlin.system.measureTimeMillis
+
+private data class ImageSaveEntry(val ts: Long, val img: Image) {
+    val unix = ts/1000
+}
 
 @SuppressLint("StaticFieldLeak")
 object MediaRuntime {
@@ -31,7 +41,7 @@ object MediaRuntime {
     private lateinit var requestLauncher: ActivityResultLauncher<Intent>
     private lateinit var ctx: Context
 
-    private var lastScreenShotDateStr: String = ""
+    private var lastImageSaveTs: Long = 0
     // screenshots: list of base64 encoded jpeg data
     private var screenshots: MutableList<String> = mutableListOf()
     private var maxScreenshotCount = 5
@@ -39,6 +49,12 @@ object MediaRuntime {
     private var requestFinishMutex = Object()
     private var requestStatus: Int = -1
     private var initialized: Boolean = false
+
+    private var saveJob: Job? = null
+    private var imageSaveChannel: Channel<ImageSaveEntry> = Channel(4, BufferOverflow.DROP_OLDEST) {
+        Log.i(TAG, "undelivered: ${it.ts}")
+        it.img.close()
+    }
 
     private fun prepareMediaRequestLauncher(activity: AppCompatActivity) {
         requestLauncher = activity.registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
@@ -77,6 +93,12 @@ object MediaRuntime {
         imageReader = ImageReader.newInstance(displayMetrics.widthPixels, displayMetrics.heightPixels, PixelFormat.RGBA_8888, 5)
         prepareMediaRequestLauncher(activity)
 
+        saveJob = executor.scope.launch {
+            imageSaveChannel.consumeAsFlow().collect {
+                saveImage(it)
+            }
+        }
+
         initialized = true
         Log.i(TAG, "$name: initialized")
     }
@@ -105,7 +127,6 @@ object MediaRuntime {
         return requestStatus
     }
 
-
     // the producer onImageAvailable is run in executor.workHandler, as the same as consumer getScreenShot
     // so  it's not required to protect the screenshots with lock
     fun onImageAvailable(imageReader: ImageReader) {
@@ -115,15 +136,35 @@ object MediaRuntime {
             return
         }
 
-        //  replace the last image if dateStr is not changed, that is, for image with the same second, keep only the last image.
-        val dateStr = getDateStr()
-        var replace = false
-        if (lastScreenShotDateStr == dateStr) {
-            // Log.v(TAG, "$name: replace image with the same date: $dateStr")
-            replace = true
+        executor.scope.launch {
+            imageSaveChannel.send(ImageSaveEntry(System.currentTimeMillis(), image))
         }
-        lastScreenShotDateStr = dateStr
+    }
 
+    fun getScreenShot(n: Int = 0): JSONObject {
+        val ret = JSONObject()
+        if (!initialized) return ret.also { it["error"] = "$name: not initialized yet"}
+
+        val screenshot = executor.executeTask {
+           screenshots.lastOrNull()
+        }
+        if (screenshot.isNullOrEmpty()) return ret.also { it["error"] = "empty screenshot queue"}
+
+        return ret.also { ret["result"] = screenshot}
+    }
+
+    private fun saveImage(entry: ImageSaveEntry) {
+        Log.i(TAG, "$name: save image ${entry.ts}")
+        //  replace the last image if dateStr is not changed, that is, for image with the same second, keep only the last image.
+
+        var replace = false
+        if (lastImageSaveTs == entry.unix) {
+            replace = true
+        } else {
+            lastImageSaveTs = entry.unix
+        }
+
+        val image = entry.img
         val plane = image.planes[0]
         val width = plane.rowStride/plane.pixelStride
 
@@ -157,17 +198,5 @@ object MediaRuntime {
         }
         bitmap.recycle()
         image.close()
-    }
-
-    fun getScreenShot(n: Int = 0): JSONObject {
-        val ret = JSONObject()
-        if (!initialized) return ret.also { it["error"] = "$name: not initialized yet"}
-
-        val screenshot = executor.executeTask {
-           screenshots.lastOrNull()
-        }
-        if (screenshot.isNullOrEmpty()) return ret.also { it["error"] = "empty screenshot queue"}
-
-        return ret.also { ret["result"] = screenshot}
     }
 }
