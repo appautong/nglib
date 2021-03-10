@@ -2,6 +2,7 @@ package cc.appauto.lib
 
 import cc.appauto.lib.ng.ClassName
 import org.junit.Test
+import java.nio.ByteBuffer
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -14,6 +15,7 @@ class ExampleUnitTest {
     @Test
     fun addition_isCorrect() {
         print(1.2345f.toInt())
+        val buffer = ByteBuffer.allocateDirect();
     }
 
     fun foo(min: Long, max: Long = min) {

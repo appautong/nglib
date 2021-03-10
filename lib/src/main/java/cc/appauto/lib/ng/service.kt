@@ -235,6 +235,8 @@ class AppAutoMediaService: Service() {
     private val channelId = "default channel"
     private var mediaProjection: MediaProjection? = null
     private var surface: Surface? = null
+    private val useMediaCodec = false
+
     private var display: VirtualDisplay? = null
 
     val foregroundNotificatioinId = 1
@@ -302,20 +304,22 @@ class AppAutoMediaService: Service() {
         display?.release()
         display = null
 
-        MediaRuntime.imageReader.setOnImageAvailableListener(null, null)
+        if (useMediaCodec) {
+            MediaRuntime.releaseVideoEncoder()
+            surface?.release()
+        }
 
-        MediaRuntime.codec?.stop()
-        MediaRuntime.codec?.release()
-        MediaRuntime.codec = null
-
-        surface?.release()
         surface = null
     }
 
     fun startMediaProjection() {
         Log.i(TAG, "$name: start media projection")
-        MediaRuntime.prepareVideoEncoder()
-        surface = MediaRuntime.codec?.createInputSurface()
+        if (useMediaCodec) {
+            MediaRuntime.setupVideoEncoder()
+            surface = MediaRuntime.codec?.createInputSurface()
+        } else {
+            surface = MediaRuntime.imageReader.surface
+        }
         display = mediaProjection?.createVirtualDisplay(
             "screenshot",
             MediaRuntime.displayMetrics.widthPixels,
@@ -326,8 +330,7 @@ class AppAutoMediaService: Service() {
             null,
             null
         )
-        // MediaRuntime.imageReader.setOnImageAvailableListener({ MediaRuntime.onImageAvailable(it) }, MediaRuntime.executor.workHandler)
-        MediaRuntime.codec?.start()
+        if (useMediaCodec) MediaRuntime.codec?.start()
     }
 
     override fun onCreate() {
