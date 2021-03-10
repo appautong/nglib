@@ -6,8 +6,7 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.PixelFormat
-import android.media.Image
-import android.media.ImageReader
+import android.media.*
 import android.os.Looper
 import android.util.Base64
 import android.util.DisplayMetrics
@@ -16,20 +15,13 @@ import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import com.alibaba.fastjson.JSONObject
-import kotlinx.coroutines.*
-import kotlinx.coroutines.channels.BufferOverflow
-import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.flow.*
 import java.io.ByteArrayOutputStream
-import kotlin.system.measureTimeMillis
-
-private data class ImageSaveEntry(val ts: Long, val img: Image) {
-    val unix = ts/1000
-}
 
 @SuppressLint("StaticFieldLeak")
 object MediaRuntime {
     private val name = "media"
+    private val VIDEO_MIME_TYPE = "video/avc"
+    private val frameRate = 10
 
     val displayMetrics = DisplayMetrics()
 
@@ -37,6 +29,7 @@ object MediaRuntime {
     var executor = HandlerExecutor("${TAG}_${name}")
 
     internal lateinit var imageReader: ImageReader
+    internal var codec: MediaCodec? = null
 
     private lateinit var requestLauncher: ActivityResultLauncher<Intent>
     private lateinit var ctx: Context
@@ -50,12 +43,6 @@ object MediaRuntime {
     private var requestStatus: Int = -1
     private var initialized: Boolean = false
 
-    private var saveJob: Job? = null
-    private var imageSaveChannel: Channel<ImageSaveEntry> = Channel(4, BufferOverflow.DROP_OLDEST) {
-        Log.i(TAG, "undelivered: ${it.ts}")
-        it.img.close()
-    }
-
     private fun prepareMediaRequestLauncher(activity: AppCompatActivity) {
         requestLauncher = activity.registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
             if (it.resultCode == Activity.RESULT_OK && it.data != null) {
@@ -63,7 +50,6 @@ object MediaRuntime {
                 val intent = Intent(ctx, AppAutoMediaService::class.java)
                 intent.putExtra("data", it.data)
                 intent.putExtra("resultCode", it.resultCode)
-                intent.putExtra("surface", imageReader.surface)
                 ctx.startService(intent)
                 requestStatus = 1
             }
@@ -90,17 +76,62 @@ object MediaRuntime {
         ctx = activity.applicationContext
 
         AppAutoContext.windowManager.defaultDisplay.getMetrics(displayMetrics)
+        Log.i(TAG, "$name: display metrics: w: ${displayMetrics.widthPixels} h: ${displayMetrics.heightPixels}")
+
         imageReader = ImageReader.newInstance(displayMetrics.widthPixels, displayMetrics.heightPixels, PixelFormat.RGBA_8888, 5)
         prepareMediaRequestLauncher(activity)
 
-        saveJob = executor.scope.launch {
-            imageSaveChannel.consumeAsFlow().collect {
-                saveImage(it)
-            }
-        }
+        MediaRuntime.prepareVideoEncoder()
 
         initialized = true
         Log.i(TAG, "$name: initialized")
+    }
+
+    private val codecCallback = object: MediaCodec.Callback() {
+        override fun onInputBufferAvailable(codec: MediaCodec, index: Int) {
+            Log.i(TAG, "$name: onInputBufferAvailable: $index")
+        }
+
+        override fun onOutputBufferAvailable(
+            codec: MediaCodec,
+            index: Int,
+            info: MediaCodec.BufferInfo
+        ) {
+            Log.i(TAG, "$name: onOutputBufferAvailable: index: $index offset: ${info.offset } size: ${info.size} flags: ${info.flags}")
+            if (info.flags.and(MediaCodec.BUFFER_FLAG_CODEC_CONFIG) != 0) {
+                // codec specific data, not media data
+            }
+            codec.releaseOutputBuffer(index, false)
+        }
+
+        override fun onError(codec: MediaCodec, e: MediaCodec.CodecException) {
+            Log.i(TAG, "$name: onError: ${codec.name} : ${e.message}")
+        }
+
+        override fun onOutputFormatChanged(codec: MediaCodec, format: MediaFormat) {
+            Log.i(TAG, "$name: onOutputFormatChanged: ${codec.name} $format")
+        }
+    }
+
+    internal fun prepareVideoEncoder() {
+        val w = if (displayMetrics.widthPixels % 2 == 0)  displayMetrics.widthPixels else displayMetrics.widthPixels+1
+        val h = if (displayMetrics.heightPixels % 2 == 0)  displayMetrics.heightPixels else displayMetrics.heightPixels+1
+        val format = MediaFormat.createVideoFormat(VIDEO_MIME_TYPE, w, h)
+        format.setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface)
+        format.setInteger(MediaFormat.KEY_BIT_RATE, 6000000)
+        format.setInteger(MediaFormat.KEY_FRAME_RATE, frameRate)
+        format.setInteger(MediaFormat.KEY_CAPTURE_RATE, frameRate)
+        format.setInteger(MediaFormat.KEY_REPEAT_PREVIOUS_FRAME_AFTER, 1000000/ frameRate)
+        format.setInteger(MediaFormat.KEY_CHANNEL_COUNT, 1)
+        format.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 1)
+
+        try {
+            codec = MediaCodec.createEncoderByType(VIDEO_MIME_TYPE)
+            codec?.configure(format, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
+            codec?.setCallback(codecCallback)
+        } catch (e: Exception) {
+            Log.e(TAG, "$name: prepare video encoder leads to exceptoin:\n${Log.getStackTraceString(e)}")
+        }
     }
 
     /**
@@ -135,10 +166,8 @@ object MediaRuntime {
             image.close()
             return
         }
-
-        executor.scope.launch {
-            imageSaveChannel.send(ImageSaveEntry(System.currentTimeMillis(), image))
-        }
+        saveImage(image)
+        image.close()
     }
 
     fun getScreenShot(n: Int = 0): JSONObject {
@@ -153,18 +182,17 @@ object MediaRuntime {
         return ret.also { ret["result"] = screenshot}
     }
 
-    private fun saveImage(entry: ImageSaveEntry) {
-        Log.i(TAG, "$name: save image ${entry.ts}")
-        //  replace the last image if dateStr is not changed, that is, for image with the same second, keep only the last image.
+    private fun saveImage(image: Image) {
+        val ts = System.currentTimeMillis()/1000
 
+        //  replace the last image if dateStr is not changed, that is, for image with the same second, keep only the last image.
         var replace = false
-        if (lastImageSaveTs == entry.unix) {
+        if (lastImageSaveTs == ts) {
             replace = true
         } else {
-            lastImageSaveTs = entry.unix
+            lastImageSaveTs = ts
         }
 
-        val image = entry.img
         val plane = image.planes[0]
         val width = plane.rowStride/plane.pixelStride
 
@@ -197,6 +225,5 @@ object MediaRuntime {
             Log.e(TAG, "$name: save screenshot bitmap leads to exception:\n${Log.getStackTraceString(e)}")
         }
         bitmap.recycle()
-        image.close()
     }
 }

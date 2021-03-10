@@ -250,17 +250,16 @@ class AppAutoMediaService: Service() {
             stopSelf(startId)
             return START_NOT_STICKY
         }
-        if (!intent.hasExtra("resultCode") || !intent.hasExtra("data") || !intent.hasExtra("surface")) {
-            Log.w(TAG, "$name: onStartCommand with invalid intent, missing mandatory fields: resultCode, data or surface, skipping...")
+        if (!intent.hasExtra("resultCode") || !intent.hasExtra("data") ) {
+            Log.w(TAG, "$name: onStartCommand with invalid intent, missing mandatory fields: resultCode and data, skipping...")
             stopSelf(startId)
             return START_NOT_STICKY
         }
         val resultCode = intent.getIntExtra("resultCode", Activity.RESULT_CANCELED)
         val data = intent.getParcelableExtra<Intent>("data")
-        surface = intent.getParcelableExtra("surface")
 
-        if (resultCode != Activity.RESULT_OK || data == null || surface == null) {
-            Log.w(TAG, "$name: onStartCommand with invalid intent, resultCode: $resultCode, data: $data, surface: $surface skipping...")
+        if (resultCode != Activity.RESULT_OK || data == null) {
+            Log.w(TAG, "$name: onStartCommand with invalid intent, resultCode: $resultCode, data: $data, skipping...")
             stopSelf(startId)
             return START_NOT_STICKY
         }
@@ -302,22 +301,33 @@ class AppAutoMediaService: Service() {
         pauseMediaProjection()
         display?.release()
         display = null
+
         MediaRuntime.imageReader.setOnImageAvailableListener(null, null)
+
+        MediaRuntime.codec?.stop()
+        MediaRuntime.codec?.release()
+        MediaRuntime.codec = null
+
+        surface?.release()
+        surface = null
     }
 
     fun startMediaProjection() {
         Log.i(TAG, "$name: start media projection")
+        MediaRuntime.prepareVideoEncoder()
+        surface = MediaRuntime.codec?.createInputSurface()
         display = mediaProjection?.createVirtualDisplay(
             "screenshot",
             MediaRuntime.displayMetrics.widthPixels,
             MediaRuntime.displayMetrics.heightPixels,
             MediaRuntime.displayMetrics.densityDpi,
             DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
-            MediaRuntime.imageReader.surface,
+            surface,
             null,
             null
         )
-        MediaRuntime.imageReader.setOnImageAvailableListener({ MediaRuntime.onImageAvailable(it) }, MediaRuntime.executor.workHandler)
+        // MediaRuntime.imageReader.setOnImageAvailableListener({ MediaRuntime.onImageAvailable(it) }, MediaRuntime.executor.workHandler)
+        MediaRuntime.codec?.start()
     }
 
     override fun onCreate() {
