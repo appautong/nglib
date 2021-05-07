@@ -13,6 +13,11 @@ class SelectionResult(val nodes: List<HierarchyNode>): Collection<HierarchyNode>
         }
     }
 
+    operator fun get(index: Int): HierarchyNode? {
+        if (index >= nodes.lastIndex) return null
+        return nodes[index]
+    }
+
     fun className(value: String): SelectionResult {
         return filter { it.className == value }.toSelectionResult()
     }

@@ -1,5 +1,6 @@
 package cc.appauto.lib.ng
 
+import android.accessibilityservice.AccessibilityService
 import android.annotation.SuppressLint
 import android.app.Activity
 import android.app.AlertDialog
@@ -9,6 +10,7 @@ import android.content.Intent
 import android.content.res.AssetManager
 import android.media.projection.MediaProjectionManager
 import android.provider.Settings
+import android.service.notification.NotificationListenerService
 import android.util.Log
 import android.view.WindowManager
 import android.view.accessibility.AccessibilityManager
@@ -22,14 +24,15 @@ object AppAutoContext {
     const val ERR_NOT_READY = "appauto context not ready: accessibility service is not connected yet"
 
     // current accessibility service and notification listener service
-    var autoSrv: AppAutoAccessibilityService? = null
-        internal set
-    var accessibilityConnected: Boolean = false
+    var autoSrv: AccessibilityService? = null
         internal set
 
-    var notiSrv: AppAutoNotificationService? = null
+    var accessibilityServiceConnected: Boolean = false
         internal set
-    var listenerConnected: Boolean = false
+
+    var notiSrv: NotificationListenerService? = null
+        internal set
+    var notificationListenerConnected: Boolean = false
         internal set
 
     // android application context
@@ -51,19 +54,24 @@ object AppAutoContext {
         private set
 
     // separate thread/handler to run the automation javascript
+    @JvmField
     var executor = HandlerExecutor("${TAG}_$name")
 
     // javascript runtime related
+    @JvmField
     val jsRuntime = JavascriptRuntime
 
     // autodraw runtime
+    @JvmField
     val autodraw = AutoDraw
 
     // media runtime
+    @JvmField
     val mediaRuntime = MediaRuntime
 
     // setupRuntime shall be called in onCreate
     @Synchronized
+    @JvmStatic
     fun setupRuntime(activity: AppCompatActivity) {
         currentActivity = activity
 
@@ -101,12 +109,27 @@ object AppAutoContext {
         Log.i(TAG, "$name: setup runtime successfully")
     }
 
+    @Synchronized
+    @JvmStatic
+    fun connectAccessibilityService(srv: AccessibilityService?, connected: Boolean = false) {
+        autoSrv = srv
+        accessibilityServiceConnected = if (srv != null) connected else false
+    }
+
+    @Synchronized
+    @JvmStatic
+    fun connectNotificationListenerService(srv: NotificationListenerService?, connected: Boolean = false) {
+        notiSrv = srv
+        notificationListenerConnected = if (srv != null) connected else false
+    }
+
     private fun onStateChange(enabled: Boolean) {
         Log.i(TAG, "$name: accessibility service state changed to $enabled")
-        accessibilityConnected = enabled
+        accessibilityServiceConnected = enabled
     }
 
     // dump the top app node recursively in appauto context's work thread
+    @JvmStatic
     fun dumpTopActiveApp() {
         val s = autoSrv ?: return
         executor.submitTask {
@@ -118,7 +141,7 @@ object AppAutoContext {
     }
 
     val topAppHierarchyString
-        get() = if (!accessibilityConnected) ERR_NOT_READY else autoSrv.getHierarchyString()
+        get() = if (!accessibilityServiceConnected) ERR_NOT_READY else autoSrv.getHierarchyString()
 
 
     fun automatorOf(name: String = "NA"): AppAutomator? {

@@ -175,7 +175,7 @@ class AppAutoAccessibilityService: AccessibilityService() {
     override fun onCreate() {
         super.onCreate()
 
-        AppAutoContext.autoSrv = this
+        AppAutoContext.connectAccessibilityService(this, false)
         Log.i(TAG, "$name: onCreate ${System.identityHashCode(this)}")
     }
 
@@ -187,14 +187,13 @@ class AppAutoAccessibilityService: AccessibilityService() {
 
     override fun onDestroy() {
         Log.i(TAG, "$name: onDestroy ${System.identityHashCode(this)}")
-        AppAutoContext.accessibilityConnected = false
-        AppAutoContext.autoSrv = null
+        AppAutoContext.connectAccessibilityService(null)
     }
 
     override fun onServiceConnected() {
         super.onServiceConnected()
         Log.i(TAG, "$name: onServiceConnected")
-        AppAutoContext.accessibilityConnected = true
+        AppAutoContext.connectAccessibilityService(this, true)
     }
 }
 
@@ -204,15 +203,14 @@ class AppAutoNotificationService: NotificationListenerService() {
     override fun onCreate() {
         super.onCreate()
 
-        AppAutoContext.notiSrv = this
+        AppAutoContext.connectNotificationListenerService(this, false)
         Log.i(TAG, "$name: onCreate ${System.identityHashCode(this)}")
     }
 
     override fun onDestroy() {
         super.onDestroy()
 
-        AppAutoContext.notiSrv = null
-        AppAutoContext.listenerConnected = false
+        AppAutoContext.connectNotificationListenerService(null)
         Log.i(TAG, "$name: onDestroy ${System.identityHashCode(this)}")
     }
 
@@ -221,12 +219,12 @@ class AppAutoNotificationService: NotificationListenerService() {
 
     override fun onListenerConnected() {
         Log.i(TAG, "$name: on listener connected ${System.identityHashCode(this)}")
-        AppAutoContext.listenerConnected = true
+        AppAutoContext.connectNotificationListenerService(this, true)
     }
 
     override fun onListenerDisconnected() {
         Log.i(TAG, "$name: on listener disconnected ${System.identityHashCode(this)}")
-        AppAutoContext.listenerConnected = false
+        AppAutoContext.connectNotificationListenerService(this, false)
     }
 }
 

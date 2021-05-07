@@ -76,6 +76,7 @@ class HierarchyTree private constructor() {
         var maxHierarchyDepth: Int =  20
 
         // do not recycle the root node, HierarchyTree.recycle would recycle it
+        @JvmStatic
         fun from(root: AccessibilityNodeInfo): HierarchyTree {
             val tree = HierarchyTree()
             tree.packageName = root.packageName.toString()

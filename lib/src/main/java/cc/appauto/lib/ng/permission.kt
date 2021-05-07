@@ -6,7 +6,7 @@ import androidx.appcompat.app.AppCompatActivity
 import cc.appauto.lib.R
 
 fun AppAutoContext.checkPermissions(activity: AppCompatActivity): Boolean {
-    if (accessibilityConnected && Settings.canDrawOverlays(activity)) return true
+    if (accessibilityServiceConnected && Settings.canDrawOverlays(activity)) return true
 
     val builder = AlertDialog.Builder(activity)
     val diag = builder.setTitle(R.string.appauto_check_permission)
@@ -21,7 +21,7 @@ fun AppAutoContext.checkPermissions(activity: AppCompatActivity): Boolean {
 
     return executor.executeTask {
         when {
-            !accessibilityConnected -> {
+            !accessibilityServiceConnected -> {
                 openAccessibilitySetting(activity)
                 false
             }
