@@ -30,7 +30,9 @@ import cc.appauto.lib.R
 fun AccessibilityService?.getHierarchyString(): String {
     if (this == null) return "null accessibility service"
     val tree = HierarchyTree.from(this) ?: return "null returned by getTopAppNode in HierarchyTree.from"
-    return tree.hierarchyString
+    val res = tree.hierarchyString
+    tree.recycle()
+    return res
 }
 
 // check gesture capability first then dispatch builder.build()
