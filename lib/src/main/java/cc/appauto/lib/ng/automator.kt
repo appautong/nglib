@@ -1,12 +1,21 @@
 package cc.appauto.lib.ng
 
 import android.accessibilityservice.AccessibilityService
+import android.view.accessibility.AccessibilityNodeInfo
 import com.alibaba.fastjson.JSONObject
 
+private val DUMMY_ACTION = fun(step: AutomationStep) {}
+
+/** AutomationStep encapsulate the basic logic unit for automation process
+ * * action: do something that make UI changes e.g.: click a button, scroll up down;
+ * * postActionDelay: delay some while after action done to make sure the latest changes of UI is taken effect
+ * * expect: condition that guarantee the action is done successfully
+ */
 class AutomationStep(val name: String, val automator: AppAutomator) {
     private var postActDelay: Long = AppAutomator.defaultPostActDelay
-    private var act: ((AutomationStep) -> Unit)? = null
+    private var act: ((AutomationStep) -> Unit) = DUMMY_ACTION
     private var exp: ((HierarchyTree, AutomationStep) -> Boolean)? = null
+
     private var retryCount: Int = AppAutomator.defaultRetryCount
 
     private var actionExecuted: Int = 0
@@ -38,17 +47,13 @@ class AutomationStep(val name: String, val automator: AppAutomator) {
     }
 
     private fun executeAction() {
-        this.act!!(this)
+        this.act(this)
         actionExecuted++
         if (postActDelay > 0) sleep(postActDelay)
     }
 
     // start the action-expect loop
     fun run(): Boolean {
-        if (act == null) {
-            message = "nil action"
-            return false
-        }
         if (exp == null) {
             // set expectation result to true if no expect runnable
             expectedSuccess = true
