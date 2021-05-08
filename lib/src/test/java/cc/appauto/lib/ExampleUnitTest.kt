@@ -1,6 +1,7 @@
 package cc.appauto.lib
 
 import cc.appauto.lib.ng.ClassName
+import com.alibaba.fastjson.JSON
 import org.junit.Test
 import java.nio.ByteBuffer
 import java.text.SimpleDateFormat
@@ -15,7 +16,6 @@ class ExampleUnitTest {
     @Test
     fun addition_isCorrect() {
         print(1.2345f.toInt())
-        val buffer = ByteBuffer.allocateDirect();
     }
 
     fun foo(min: Long, max: Long = min) {
@@ -49,6 +49,20 @@ class ExampleUnitTest {
         if (res2?.groupValues != null) println(res2.groupValues.joinToString(","))
         if (res3?.groupValues != null) println(res3.groupValues.joinToString(","))
         println(-res2!!.groupValues[1].toInt())
+    }
+
+    @Test
+    fun testReplaceUsingRegexp() {
+        val template = "\${time} \${name}您好，点击链接查看健康报告：https://w.url.cn/s/A7s5EU4"
+        val r = Regex("""\$\{(\w+)\}""")
+        val ret = r.replace(template) {
+            when(it.groupValues[1]) {
+                "time1" -> "2020-01-02 11:22:33"
+                "name1" -> "testname"
+                else -> ""
+            }
+        }
+        println("template is $template, ret is: $ret")
     }
 
     @Test
