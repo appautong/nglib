@@ -4,6 +4,7 @@ import android.util.Log
 import cc.appauto.lib.ng.AppAutoContext.ERR_NOT_READY
 import com.alibaba.fastjson.JSON
 import com.alibaba.fastjson.JSONObject
+import com.faendir.rhino_android.RhinoAndroidHelper
 import org.mozilla.javascript.Context
 import org.mozilla.javascript.Scriptable
 import org.mozilla.javascript.ScriptableObject
@@ -35,7 +36,8 @@ object JavascriptRuntime {
             if (initialized) return@submitTask
             initialized = true
 
-            ctx = Context.enter()
+            Log.i(TAG, "initializing javascript runtime using cache dir: ${AppAutoContext.appContext.filesDir}")
+            ctx = RhinoAndroidHelper(AppAutoContext.appContext.filesDir).enterContext()
             ctx.optimizationLevel = -1
 
             val modules = mutableListOf<String>()

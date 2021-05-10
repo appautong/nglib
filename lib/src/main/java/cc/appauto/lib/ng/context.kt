@@ -103,7 +103,7 @@ object AppAutoContext {
 
         // skip initialize javascript runtime at release mode
         // currently, there is issues to initialize runtime in release mode
-        if (BuildConfig.DEBUG) jsRuntime.setup(appContext)
+        jsRuntime.setup(appContext)
 
         autodraw.setup(appContext)
 
