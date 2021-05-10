@@ -24,6 +24,10 @@
   public protected *;
 }
 
+-keep public class cc.appauto.lib.** {
+  public protected *;
+}
+
 -keep public class kotlin.** {
   public protected *;
 }

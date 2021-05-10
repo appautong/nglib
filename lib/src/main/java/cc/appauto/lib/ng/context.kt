@@ -15,7 +15,6 @@ import android.util.Log
 import android.view.WindowManager
 import android.view.accessibility.AccessibilityManager
 import androidx.appcompat.app.AppCompatActivity
-import cc.appauto.lib.BuildConfig
 import cc.appauto.lib.R
 
 @SuppressLint("StaticFieldLeak")
@@ -148,6 +147,7 @@ object AppAutoContext {
         get() = if (!accessibilityServiceConnected) ERR_NOT_READY else autoSrv.getHierarchyString()
 
 
+    @JvmStatic
     fun automatorOf(name: String = "NA"): AppAutomator? {
         val s = autoSrv ?: return null
         return AppAutomator(s, name)
