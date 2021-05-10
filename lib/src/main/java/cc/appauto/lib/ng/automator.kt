@@ -2,9 +2,16 @@ package cc.appauto.lib.ng
 
 import android.accessibilityservice.AccessibilityService
 import android.view.accessibility.AccessibilityNodeInfo
+import cc.appauto.lib.tryRecycle
 import com.alibaba.fastjson.JSONObject
 
 private val DUMMY_ACTION = fun(step: AutomationStep) {}
+
+
+data class ActionTarget(val name: String, val filter: (tree: HierarchyTree) -> SelectionResult) {
+    var target: AccessibilityNodeInfo? = null
+        internal set
+}
 
 /** AutomationStep encapsulate the basic logic unit for automation process
  * * action: do something that make UI changes e.g.: click a button, scroll up down;
@@ -23,6 +30,31 @@ class AutomationStep(val name: String, val automator: AppAutomator) {
         private set
 
     var message: String? = null
+
+    private var actTargets: MutableMap<String, ActionTarget> = mutableMapOf()
+
+    // setupActionNode add a constraint on given action node
+    // all action nodes shall be ready before the action executed
+    fun setupActionNode(name: String, filter: (tree: HierarchyTree) -> SelectionResult): AutomationStep    {
+        val elem = ActionTarget(name, filter)
+        actTargets.put(name, elem)
+        return this
+    }
+
+    // getActionNodeInfo is a helper function to be called in action callback
+    fun getActionNodeInfo(name: String): AccessibilityNodeInfo? {
+        if (!actTargets.containsKey(name)) {
+           throw IndexOutOfBoundsException("no key: $name in action targets map")
+        }
+        return actTargets[name]!!.target
+    }
+
+    fun recycleActionNodes() {
+        actTargets.forEach { (_, t ) ->
+            t.target?.tryRecycle()
+        }
+        actTargets.clear()
+    }
 
     // delay given milli-seconds after did action to wait UI change taking place
     fun postActionDelay(ms: Long): AutomationStep {
@@ -47,8 +79,30 @@ class AutomationStep(val name: String, val automator: AppAutomator) {
     }
 
     private fun executeAction() {
-        this.act(this)
+        var allTargetReady = false
+
+        if (actTargets.isEmpty()) allTargetReady = true
+        else HierarchyTree.from(automator.srv)?.let { tree ->
+            allTargetReady = true
+            for ((_, t) in actTargets) {
+                val res = t.filter(tree)
+                if (res.isEmpty()) {
+                    this.message = "can not find action node ${t.name}, controls:\n${tree.hierarchyString}"
+                    allTargetReady = false
+                    break
+                }
+                res.first().also {
+                    t.target = tree.getAccessibilityNodeInfo(it)
+                    tree.markKept(it)
+                }
+            }
+            tree.recycle()
+        }
+        // execute the action only when all action targets are found
+        if (allTargetReady) this.act(this)
+
         actionExecuted++
+
         if (postActDelay > 0) sleep(postActDelay)
     }
 
@@ -121,14 +175,23 @@ class AppAutomator(val srv: AccessibilityService, val name: String) {
     }
 
     fun run(): AppAutomator {
+        var anyStepFail = false
         for (step in steps) {
             if (!step.run()) {
                 this.message = "run step ${step.name} failed: ${step.message}"
-                return this
+                anyStepFail = true
+                break
             }
         }
-        this.message = "run ${steps.size} steps successfully"
-        allStepsSucceed = true
+        if (!anyStepFail) {
+            this.message = "run ${steps.size} steps successfully"
+            allStepsSucceed = true
+        }
+
+        // recycle all node info accuquired in each step
+        steps.forEach {
+            it.recycleActionNodes()
+        }
         return this
     }
 
