@@ -15,6 +15,7 @@ import android.util.Log
 import android.view.WindowManager
 import android.view.accessibility.AccessibilityManager
 import androidx.appcompat.app.AppCompatActivity
+import cc.appauto.lib.BuildConfig
 import cc.appauto.lib.R
 
 @SuppressLint("StaticFieldLeak")
@@ -100,7 +101,10 @@ object AppAutoContext {
         httpd = Httpd(appContext)
         httpd.start()
 
-        jsRuntime.setup(appContext)
+        // skip initialize javascript runtime at release mode
+        // currently, there is issues to initialize runtime in release mode
+        if (BuildConfig.DEBUG) jsRuntime.setup(appContext)
+
         autodraw.setup(appContext)
 
         mediaRuntime.setup(activity)
