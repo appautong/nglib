@@ -23,6 +23,8 @@ object AppAutoContext {
 
     const val ERR_NOT_READY = "appauto context not ready: accessibility service is not connected yet"
 
+    var HttpdPort = 8900
+
     // current accessibility service and notification listener service
     var autoSrv: AccessibilityService? = null
         internal set
@@ -97,11 +99,9 @@ object AppAutoContext {
 
 
         httpClient = HttpClient(appContext)
-        httpd = Httpd(appContext)
-        httpd.start()
 
-        // skip initialize javascript runtime at release mode
-        // currently, there is issues to initialize runtime in release mode
+        restartHttpd(HttpdPort)
+
         jsRuntime.setup(appContext)
 
         autodraw.setup(appContext)
@@ -110,6 +110,21 @@ object AppAutoContext {
 
         initialized = true
         Log.i(TAG, "$name: setup runtime successfully")
+    }
+
+    fun restartHttpd(port: Int) {
+        if (this::httpd.isInitialized) {
+            httpd.closeAllConnections()
+            httpd.stop()
+        }
+        try {
+            HttpdPort = port
+            httpd = Httpd(appContext, HttpdPort)
+            httpd.start()
+            Log.i(TAG, "httpd started on $HttpdPort")
+        } catch (e: Exception) {
+            Log.e(TAG, "start httpd on $HttpdPort failed, ${e.message}")
+        }
     }
 
     @Synchronized

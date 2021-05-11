@@ -8,7 +8,7 @@ import fi.iki.elonen.NanoHTTPD
 import java.io.File
 
 class Httpd internal constructor(val ctx: Context, val port: Int=8900): NanoHTTPD(port) {
-    private val name = "httpd"
+    private val name = "httpd_$port"
 
     private fun handleResetJsRequire(session: IHTTPSession): JSONObject {
         if (!AppAutoContext.initialized) return JSONObject().also { it["error"] = AppAutoContext.ERR_NOT_READY }
