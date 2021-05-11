@@ -5,8 +5,10 @@ import android.view.accessibility.AccessibilityNodeInfo
 import cc.appauto.lib.tryRecycle
 import com.alibaba.fastjson.JSONObject
 
-private val DUMMY_ACTION = fun(step: AutomationStep) {}
-
+private val DUMMY_ACTION = fun(_: AutomationStep) {}
+private val DUMMY_EXPECT = fun(_: HierarchyTree, _: AutomationStep): Boolean {
+    return true
+}
 
 data class ActionTarget(val name: String, val filter: (tree: HierarchyTree) -> SelectionResult) {
     var target: AccessibilityNodeInfo? = null
@@ -21,7 +23,7 @@ data class ActionTarget(val name: String, val filter: (tree: HierarchyTree) -> S
 class AutomationStep(val name: String, val automator: AppAutomator) {
     private var postActDelay: Long = AppAutomator.defaultPostActDelay
     private var act: ((AutomationStep) -> Unit) = DUMMY_ACTION
-    private var exp: ((HierarchyTree, AutomationStep) -> Boolean)? = null
+    private var exp: ((HierarchyTree, AutomationStep) -> Boolean) = DUMMY_EXPECT
 
     private var retryCount: Int = AppAutomator.defaultRetryCount
 
@@ -42,14 +44,15 @@ class AutomationStep(val name: String, val automator: AppAutomator) {
     }
 
     // getActionNodeInfo is a helper function to be called in action callback
-    fun getActionNodeInfo(name: String): AccessibilityNodeInfo? {
+    // the node info object will be recycled automatically when automator finished running
+    fun getActionNodeInfo(name: String): AccessibilityNodeInfo {
         if (!actTargets.containsKey(name)) {
            throw IndexOutOfBoundsException("no key: $name in action targets map")
         }
-        return actTargets[name]!!.target
+        return actTargets[name]!!.target!!
     }
 
-    fun recycleActionNodes() {
+    internal fun recycleActionNodes() {
         actTargets.forEach { (_, t ) ->
             t.target?.tryRecycle()
         }
@@ -62,11 +65,13 @@ class AutomationStep(val name: String, val automator: AppAutomator) {
         return this
     }
 
+    // if not specified a action handler, use a dummy action handler do nothing
     fun action(r: (AutomationStep) -> Unit): AutomationStep {
         this.act = r
         return this
     }
 
+    // if not specified a predicate, use a dummy expect handler return true always
     fun expect(predicate: (tree: HierarchyTree, step: AutomationStep) -> Boolean): AutomationStep {
         this.exp = predicate
         return this
@@ -92,6 +97,8 @@ class AutomationStep(val name: String, val automator: AppAutomator) {
                     break
                 }
                 res.first().also {
+                    // recycle the previous target if existed
+                    t.target?.tryRecycle()
                     t.target = tree.getAccessibilityNodeInfo(it)
                     tree.markKept(it)
                 }
@@ -108,12 +115,6 @@ class AutomationStep(val name: String, val automator: AppAutomator) {
 
     // start the action-expect loop
     fun run(): Boolean {
-        if (exp == null) {
-            // set expectation result to true if no expect runnable
-            expectedSuccess = true
-            message = "no expectation, set step succeed"
-            return expectedSuccess
-        }
         do {
             // execute the action and increase the executed count
             this.executeAction()
@@ -126,7 +127,8 @@ class AutomationStep(val name: String, val automator: AppAutomator) {
                     break
                 }
             }
-            val matched = this.exp!!(tree, this)
+
+            val matched = this.exp(tree, this)
             if (matched) {
                 expectedSuccess = true
                 message = "succeed in NO.$actionExecuted execution"

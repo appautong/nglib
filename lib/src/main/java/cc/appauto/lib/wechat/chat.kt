@@ -270,76 +270,30 @@ fun chatPageSendRedPacket(srv: AccessibilityService, customWalker: NodeWalker?, 
 fun chatPageAddPeer(srv: AccessibilityService): JSONObject {
     val ret = JSONObject()
 
-    // find the top notification bar control
-    val ht = HierarchyTree.from(srv)
-    if (ht == null) {
-        ret["error"] = "chatPageAddPeer: setup hierarchy tree failed"
-        return ret
-    }
-
-    val node = ht.classNameSelector("${ClassName.Linearlayout}>${ClassName.TextView}").text("对方还不是你的朋友").firstOrNull()
-
-    if (node == null) {
-        ht.recycle()
-        return ret.also {
-            it["result"] = "no top notification for non-friend peer"
-            it["code"] = 0
-        }
-    }
-
-    val notiBar = node.clickableAncestor
-    if (notiBar == null) {
-        ht.recycle()
-        return ret.also {
-            ret["error"] = "can not find clickable parent for $node"
-        }
-    }
-
-    ht.markKept(notiBar)
-    val nodeInfo = ht.getAccessibilityNodeInfo(notiBar)!!
-    ht.recycle()
-
     // use automator to click the top notification bar to accept the new peer friend
     val automator = AppAutomator(srv, "chatPageAddPeer")
 
-    automator.stepOf("click top notification").action {
-        nodeInfo.click(null)
-    }.expect { tree, _ ->
-        val tmp = tree.classNameSelector("${ClassName.Linearlayout}>${ClassName.TextView}").text("添加到通讯录").firstOrNull()?.clickableAncestor
-        if (tmp != null) {
-            tree.markKept(tmp)
-            automator["add_as_contact"] = tree.getAccessibilityNodeInfo(tmp)!!
-            true
-        } else
-            false
+    automator.stepOf("click top notification").setupActionNode("top_noti_bar") { tree ->
+        tree.classNameSelector("${ClassName.Linearlayout}>${ClassName.TextView}").text("对方还不是你的朋友").clickableParent()
+    }.action {
+        it.getActionNodeInfo("top_noti_bar").click(null)
     }.postActionDelay(2000)
 
-    automator.stepOf("click add to contacts").action {
-        val add = automator["add_as_contact"] as AccessibilityNodeInfo
-        add.click(null)
-    }.expect { tree, _ ->
-        val tmp = tree.classNameSelector("${ClassName.Linearlayout}>${ClassName.TextView}").text("发消息").firstOrNull()?.clickableAncestor
-        if (tmp != null) {
-            tree.markKept(tmp)
-            automator["send_message"] = tree.getAccessibilityNodeInfo(tmp)!!
-            true
-        } else
-            false
+    automator.stepOf("click add to contacts").setupActionNode("add_as_contact") { tree ->
+        tree.classNameSelector("${ClassName.Linearlayout}>${ClassName.TextView}").text("添加到通讯录").clickableParent()
+    }.action {
+        it.getActionNodeInfo("add_as_contact").click(null)
     }.postActionDelay(2000)
 
-    automator.stepOf("click send message").action {
-        val send = automator["send_message"] as AccessibilityNodeInfo
-        send.click(null)
+    automator.stepOf("click send message").setupActionNode("send_message"){tree ->
+        tree.classNameSelector("${ClassName.Linearlayout}>${ClassName.TextView}").text("发消息").clickableParent()
+    }.action {
+        it.getActionNodeInfo("send_message").click(null)
     }.expect { tree, _ ->
         tree.classNameSelector("${ClassName.Linearlayout}>${ClassName.ImageButton}").contentDescription("更多功能按钮").firstOrNull() != null
     }.postActionDelay(2000)
 
     automator.run()
-
-    nodeInfo.recycle()
-    (automator["add_as_contact"] as AccessibilityNodeInfo?)?.recycle()
-    (automator["send_message"] as AccessibilityNodeInfo?)?.recycle()
-
 
     automator.close()
 

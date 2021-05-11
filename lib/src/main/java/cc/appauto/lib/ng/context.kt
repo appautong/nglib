@@ -14,8 +14,10 @@ import android.service.notification.NotificationListenerService
 import android.util.Log
 import android.view.WindowManager
 import android.view.accessibility.AccessibilityManager
+import android.view.accessibility.AccessibilityNodeInfo
 import androidx.appcompat.app.AppCompatActivity
 import cc.appauto.lib.R
+import com.alibaba.fastjson.JSONObject
 
 @SuppressLint("StaticFieldLeak")
 object AppAutoContext {
@@ -161,6 +163,24 @@ object AppAutoContext {
     val topAppHierarchyString
         get() = if (!accessibilityServiceConnected) ERR_NOT_READY else autoSrv.getHierarchyString()
 
+
+    fun setContent(node: AccessibilityNodeInfo, content: String): JSONObject {
+        return node.setContent(content)
+    }
+
+    @JvmOverloads
+    fun click(node: AccessibilityNodeInfo, useCoordinate: Boolean = false) {
+        if (useCoordinate) {
+            node.click(autoSrv)
+            return
+        }
+        node.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+    }
+
+    // scroll duration shall not less than 40ms, as it will accelerate the scroll process hugely
+    fun scrollUpDown(isUp: Boolean, screenPercent: Float, duration: Long) {
+        autoSrv?.scrollUpDown(isUp, screenPercent, duration)
+    }
 
     @JvmStatic
     fun automatorOf(name: String = "NA"): AppAutomator? {

@@ -99,6 +99,8 @@ object JavascriptRuntime {
         return obj
     }
 
+    // use reflect to clear exported module cache, so the module will be reloaded from disk
+    // at next require
     internal fun resetRequire(require: Require): JSONObject {
         val ret = JSONObject()
         if (!initialized) return ret.also {  it["error"] = ERR_NOT_READY }

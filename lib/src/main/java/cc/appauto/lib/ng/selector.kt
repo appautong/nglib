@@ -22,10 +22,17 @@ class SelectionResult(val nodes: List<HierarchyNode>): Collection<HierarchyNode>
         return filter { it.className == value }.toSelectionResult()
     }
 
+    // return the clickable parent collection for all nodes in current selection result
+    fun clickableParent(): SelectionResult {
+        return filter { it.parent != null }.map { it.parent!! }.toSelectionResult()
+    }
+
+    @JvmOverloads
     fun text(value: String, exactlyMatch: Boolean = false): SelectionResult {
         return filter { contentCompare(it.text, value, exactlyMatch)}.toSelectionResult()
     }
 
+    @JvmOverloads
     fun contentDescription(value: String, exactlyMatch: Boolean = false): SelectionResult {
         return filter {contentCompare(it.contentDescription, value, exactlyMatch)}.toSelectionResult()
     }

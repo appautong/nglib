@@ -127,13 +127,7 @@ class HierarchyTree private constructor() {
     fun print() = this.root?.print()
 
     val hierarchyString
-        get() = if (root == null)
-            "null root node"
-        else {
-            val sb = StringBuilder()
-            root!!.walk { sb.appendLine(it.string) }
-            sb.toString()
-        }
+        get() = root?.hierarchyString ?: "null root node"
 
     // mark the corresponded AccessibilityNodeInfo shall not be recycled by HierarchyTree.recycle
     fun markKept(vararg nodes: HierarchyNode) {
@@ -256,6 +250,12 @@ class HierarchyNode(val id: String) {
             sb.append("|___")
         }
         sb.append(this.string)
+        sb.toString()
+    }
+
+    val hierarchyString: String by lazy {
+        val sb = StringBuilder()
+        walk { sb.appendLine(it.string) }
         sb.toString()
     }
 

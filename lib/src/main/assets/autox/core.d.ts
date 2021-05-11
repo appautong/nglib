@@ -46,10 +46,10 @@ interface SelectionResult {
     className(value: string): SelectionResult;
 
     // further selection against control text
-    text(value: string): SelectionResult;
+    text(value: string, exactlyMatch?: boolean): SelectionResult;
 
     // further selection against control content description
-    contentDescription(value: string): SelectionResult;
+    contentDescription(value: string, exactlyMatch?: boolean): SelectionResult;
 
     // further selection against control visibility
     isVisibleToUser(value: string): SelectionResult;
@@ -69,6 +69,15 @@ interface Rect {
     centerY(): number;
     toShortString(): string;
     toString(): string;
+}
+
+interface AccessibilityNodeInfo {
+
+}
+
+interface JSONObject {
+    toJSONString(): string;
+    getString(key: string): string;
 }
 
 interface HierarchyNode {
@@ -96,6 +105,7 @@ interface HierarchyNode {
     isScrollable: boolean;
     isEditable: boolean;
 
+    hierarchyString: string;
     string: string;
     stringIndent: string;
     hierarchyId: string;
@@ -164,6 +174,12 @@ interface AutomationStep {
 
     // set the delay after executed the action
     postActionDelay(ms: number): AutomationStep;
+
+    // setupActionNode add a constraint on given action node
+    // all action nodes shall be ready before the action executed
+    setupActionNode(name: string, filter:  (tree: HierarchyTree) => SelectionResult);
+
+    getActionNodeInfo(name: string): any;
 }
 
 interface Automator {
@@ -191,17 +207,26 @@ interface AppAutoContextConstructor {
     // create a new automator instance with given name
     automatorOf(name): Automator;
 
+    // dump top active app hierarchy
+    dumpTopActiveApp();
+
     // whether accessibility service is connected now
-    accessibilityConnected: Boolean;
+    accessibilityServiceConnected: boolean;
 
     // whehter notification service is connected now
-    listenerConnected: Boolean;
+    notificationListenerConnected: boolean;
 
     // default 3; this value will take effect for all automation step created thereafter
     automatorDefaultRetryCount: number;
 
     // default 1000, unit: ms; this value will take effect for all automation step created thereafter
     automatorDefaultPostActionDelay: number;
+
+    topAppHierarchyString: string;
+
+    click(node: AccessibilityNodeInfo, useCoordinate?: boolean);
+    scrollUpDown(isUp: boolean, screenPercent: number, duration: number);
+    setContent(node: AccessibilityNodeInfo, content: string): JSONObject;
 }
 
 declare function sprintf(format: string, ...args: any[]): string;
