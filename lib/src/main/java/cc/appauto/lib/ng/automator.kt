@@ -22,6 +22,7 @@ data class ActionTarget(val name: String, val filter: (tree: HierarchyTree) -> S
  */
 class AutomationStep(val name: String, val automator: AppAutomator) {
     private var postActDelay: Long = AppAutomator.defaultPostActDelay
+    private var preActDelay: Long = AppAutomator.defaultPreActDelay
     private var act: ((AutomationStep) -> Unit) = DUMMY_ACTION
     private var exp: ((HierarchyTree, AutomationStep) -> Boolean) = DUMMY_EXPECT
 
@@ -65,6 +66,13 @@ class AutomationStep(val name: String, val automator: AppAutomator) {
         return this
     }
 
+    // delay given milli-seconds if there are action targets for current step
+    fun preActionDelay(ms: Long): AutomationStep {
+        if (ms >= 0) preActDelay = ms
+        return this
+    }
+
+
     // if not specified a action handler, use a dummy action handler do nothing
     fun action(r: (AutomationStep) -> Unit): AutomationStep {
         this.act = r
@@ -83,49 +91,50 @@ class AutomationStep(val name: String, val automator: AppAutomator) {
         return this
     }
 
-    private fun executeAction() {
-        var allTargetReady = false
+    // return whether all action targets are found
+    private fun prepareAllActionTarget(): Boolean {
+        if (actTargets.isEmpty()) return true
+        sleep(preActDelay)
 
-        if (actTargets.isEmpty()) allTargetReady = true
-        else HierarchyTree.from(automator.srv)?.let { tree ->
-            allTargetReady = true
-            for ((_, t) in actTargets) {
-                val res = t.filter(tree)
-                if (res.isEmpty()) {
-                    this.message = "can not find action node ${t.name}, controls:\n${tree.hierarchyString}"
-                    allTargetReady = false
-                    break
-                }
-                res.first().also {
-                    // recycle the previous target if existed
-                    t.target?.tryRecycle()
-                    t.target = tree.getAccessibilityNodeInfo(it)
-                    tree.markKept(it)
-                }
-            }
-            tree.recycle()
+        val tree = HierarchyTree.from(automator.srv)
+        if (tree == null) {
+            this.message = "prepareAllActionTarget: create hierarchy tree from automator.srv failed"
+            return false
         }
-        // execute the action only when all action targets are found
-        if (allTargetReady) this.act(this)
+        for ((_, t) in actTargets) {
+            val res = t.filter(tree)
+            if (res.isEmpty()) {
+                this.message = "can not find action node ${t.name}, controls:\n${tree.hierarchyString}"
+                tree.recycle()
+                return false
+            }
 
-        actionExecuted++
-
-        if (postActDelay > 0) sleep(postActDelay)
+            res.first().also {
+                // recycle the previous target if existed
+                t.target?.tryRecycle()
+                t.target = tree.getAccessibilityNodeInfo(it)
+                tree.markKept(it)
+            }
+        }
+        tree.recycle()
+        return true
     }
 
     // start the action-expect loop
     fun run(): Boolean {
         do {
-            // execute the action and increase the executed count
-            this.executeAction()
+            actionExecuted++
+
+            if (!this.prepareAllActionTarget()) {
+                if (actionExecuted > retryCount) break else continue
+            }
+            this.act(this)
+            sleep(postActDelay)
+
             val tree = HierarchyTree.from(automator.srv)
             if (tree == null) {
                 message = "null hierarchy tree in NO.$actionExecuted execution"
-                if (actionExecuted < retryCount) {
-                    continue
-                } else {
-                    break
-                }
+                if (actionExecuted > retryCount) break else continue
             }
 
             val matched = this.exp(tree, this)
@@ -165,9 +174,11 @@ class AppAutomator(val srv: AccessibilityService, val name: String) {
 
     companion object {
         @JvmStatic
-        var defaultRetryCount: Int = 3
+        var defaultRetryCount: Int = 2
         @JvmStatic
-        var defaultPostActDelay: Long = 1000
+        var defaultPostActDelay: Long = 2000
+        @JvmStatic
+        var defaultPreActDelay: Long = 1000
     }
 
     fun stepOf(name: String): AutomationStep {

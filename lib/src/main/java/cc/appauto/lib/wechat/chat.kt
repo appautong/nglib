@@ -273,11 +273,13 @@ fun chatPageAddPeer(srv: AccessibilityService): JSONObject {
     // use automator to click the top notification bar to accept the new peer friend
     val automator = AppAutomator(srv, "chatPageAddPeer")
 
+    var foundNotfiBar = false
     automator.stepOf("click top notification").setupActionNode("top_noti_bar") { tree ->
         tree.classNameSelector("${ClassName.Linearlayout}>${ClassName.TextView}").text("对方还不是你的朋友").clickableParent()
     }.action {
+        foundNotfiBar = true
         it.getActionNodeInfo("top_noti_bar").click(null)
-    }.postActionDelay(2000)
+    }.postActionDelay(2000).retry(1)
 
     automator.stepOf("click add to contacts").setupActionNode("add_as_contact") { tree ->
         tree.classNameSelector("${ClassName.Linearlayout}>${ClassName.TextView}").text("添加到通讯录").clickableParent()
@@ -297,6 +299,11 @@ fun chatPageAddPeer(srv: AccessibilityService): JSONObject {
 
     automator.close()
 
+    if (!foundNotfiBar) return ret.also {
+        it["code"] = 0
+        it["result"] = "can not find the new peer friend notification bar"
+        Log.i(TAG, it.getString("result"))
+    }
     if (!automator.allStepsSucceed) return ret.also {
         it["error"] = automator.message
         it["code"] = -1

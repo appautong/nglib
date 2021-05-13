@@ -21,6 +21,7 @@ enum class Position {
 }
 
 fun sleep(minMS: Long, maxMs: Long = minMS) {
+    if (minMS == 0L) return
     val num: Long = if (maxMs > minMS) r.nextInt((maxMs - minMS).toInt()) + minMS  else minMS
     try {
         Thread.sleep(num)
