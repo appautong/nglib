@@ -7,7 +7,6 @@ import android.util.Log
 import android.view.accessibility.AccessibilityNodeInfo
 import cc.appauto.lib.*
 import cc.appauto.lib.ng.AppAutomator
-import cc.appauto.lib.ng.HierarchyTree
 import com.alibaba.fastjson.JSONObject
 
 private fun getKeyboardPostions(root: Rect, collapseKeyboard: Rect): Map<String, Point> {
@@ -279,12 +278,16 @@ fun chatPageAddPeer(srv: AccessibilityService): JSONObject {
     }.action {
         foundNotfiBar = true
         it.getActionNodeInfo("top_noti_bar").click(null)
+    }.expect { tree, _ ->
+        tree.classNameSelector("${ClassName.Linearlayout}>${ClassName.TextView}").text("添加到通讯录").clickableParent().isNotEmpty()
     }.postActionDelay(2000).retry(1)
 
     automator.stepOf("click add to contacts").setupActionNode("add_as_contact") { tree ->
         tree.classNameSelector("${ClassName.Linearlayout}>${ClassName.TextView}").text("添加到通讯录").clickableParent()
     }.action {
         it.getActionNodeInfo("add_as_contact").click(null)
+    }.expect { tree, _ ->
+        tree.classNameSelector("${ClassName.Linearlayout}>${ClassName.TextView}").text("发消息").clickableParent().isNotEmpty()
     }.postActionDelay(2000)
 
     automator.stepOf("click send message").setupActionNode("send_message"){tree ->

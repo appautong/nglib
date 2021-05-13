@@ -6,8 +6,9 @@ import cc.appauto.lib.tryRecycle
 import com.alibaba.fastjson.JSONObject
 
 private val DUMMY_ACTION = fun(_: AutomationStep) {}
-private val DUMMY_EXPECT = fun(_: HierarchyTree, _: AutomationStep): Boolean {
-    return true
+private val DUMMY_EXPECT = fun(_: HierarchyTree, step: AutomationStep): Boolean {
+    step.message = "dummy expect always returns false"
+    return false
 }
 
 data class ActionTarget(val name: String, val filter: (tree: HierarchyTree) -> SelectionResult) {
@@ -79,7 +80,7 @@ class AutomationStep(val name: String, val automator: AppAutomator) {
         return this
     }
 
-    // if not specified a predicate, use a dummy expect handler return true always
+    // if not specified a predicate, use a dummy expect handler return false always
     fun expect(predicate: (tree: HierarchyTree, step: AutomationStep) -> Boolean): AutomationStep {
         this.exp = predicate
         return this
