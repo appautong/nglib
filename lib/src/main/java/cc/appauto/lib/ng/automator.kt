@@ -21,7 +21,7 @@ data class ActionTarget(val name: String, val filter: (tree: HierarchyTree) -> S
  * * postActionDelay: delay some while after action done to make sure the latest changes of UI is taken effect
  * * expect: condition that guarantee the action is done successfully
  */
-class AutomationStep(val name: String, val automator: AppAutomator) {
+class AutomationStep @JvmOverloads constructor(val name: String, var automator: AppAutomator? = null) {
     private var postActDelay: Long = AppAutomator.defaultPostActDelay
     private var preActDelay: Long = AppAutomator.defaultPreActDelay
     private var act: ((AutomationStep) -> Unit) = DUMMY_ACTION
@@ -94,10 +94,15 @@ class AutomationStep(val name: String, val automator: AppAutomator) {
 
     // return whether all action targets are found
     private fun prepareAllActionTarget(): Boolean {
+        if (automator ==  null) {
+            this.message = "null automator"
+            return false
+        }
+
         if (actTargets.isEmpty()) return true
         sleep(preActDelay)
 
-        val tree = HierarchyTree.from(automator.srv)
+        val tree = HierarchyTree.from(automator!!.srv)
         if (tree == null) {
             this.message = "prepareAllActionTarget: create hierarchy tree from automator.srv failed"
             return false
@@ -123,6 +128,11 @@ class AutomationStep(val name: String, val automator: AppAutomator) {
 
     // start the action-expect loop
     fun run(): Boolean {
+        if (automator == null) {
+            this.message = "run failed: null automator"
+            return false
+        }
+
         do {
             actionExecuted++
 
@@ -132,7 +142,7 @@ class AutomationStep(val name: String, val automator: AppAutomator) {
             this.act(this)
             sleep(postActDelay)
 
-            val tree = HierarchyTree.from(automator.srv)
+            val tree = HierarchyTree.from(automator!!.srv)
             if (tree == null) {
                 message = "null hierarchy tree in NO.$actionExecuted execution"
                 if (actionExecuted > retryCount) break else continue
