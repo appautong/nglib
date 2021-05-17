@@ -1,6 +1,7 @@
 package cc.appauto.lib.ng
 
 import android.accessibilityservice.AccessibilityService
+import android.util.Log
 import android.view.accessibility.AccessibilityNodeInfo
 import cc.appauto.lib.tryRecycle
 import com.alibaba.fastjson.JSONObject
@@ -14,6 +15,9 @@ private val DUMMY_EXPECT = fun(_: HierarchyTree, step: AutomationStep): Boolean 
 data class ActionTarget(val name: String, val filter: (tree: HierarchyTree) -> SelectionResult) {
     var target: AccessibilityNodeInfo? = null
         internal set
+
+    // whether this ActionTarget is optional
+    var optional: Boolean = false
 }
 
 /** AutomationStep encapsulate the basic logic unit for automation process
@@ -21,7 +25,7 @@ data class ActionTarget(val name: String, val filter: (tree: HierarchyTree) -> S
  * * postActionDelay: delay some while after action done to make sure the latest changes of UI is taken effect
  * * expect: condition that guarantee the action is done successfully
  */
-class AutomationStep @JvmOverloads constructor(val name: String, var automator: AppAutomator? = null) {
+class AutomationStep constructor(val name: String, val automator: AppAutomator) {
     private var postActDelay: Long = AppAutomator.defaultPostActDelay
     private var preActDelay: Long = AppAutomator.defaultPreActDelay
     private var act: ((AutomationStep) -> Unit) = DUMMY_ACTION
@@ -43,6 +47,19 @@ class AutomationStep @JvmOverloads constructor(val name: String, var automator: 
         val elem = ActionTarget(name, filter)
         actTargets.put(name, elem)
         return this
+    }
+
+    // setupActionNode add a constraint on given action node
+    // later, isActionTargetFound can be used to test whether given action node is found
+    fun setupOptionalActionNode(name: String, filter: (tree: HierarchyTree) -> SelectionResult): AutomationStep    {
+        val elem = ActionTarget(name, filter)
+        elem.optional = true
+        actTargets.put(name, elem)
+        return this
+    }
+
+    fun actionTargetIsFound(name: String): Boolean {
+        return actTargets[name]?.target != null
     }
 
     // getActionNodeInfo is a helper function to be called in action callback
@@ -94,30 +111,29 @@ class AutomationStep @JvmOverloads constructor(val name: String, var automator: 
 
     // return whether all action targets are found
     private fun prepareAllActionTarget(): Boolean {
-        if (automator ==  null) {
-            this.message = "null automator"
-            return false
-        }
-
         if (actTargets.isEmpty()) return true
         sleep(preActDelay)
 
-        val tree = HierarchyTree.from(automator!!.srv)
+        val tree = HierarchyTree.from(automator.srv)
         if (tree == null) {
             this.message = "prepareAllActionTarget: create hierarchy tree from automator.srv failed"
             return false
         }
         for ((_, t) in actTargets) {
+            // recycle the previous target if existed
+            t.target?.tryRecycle()
+            t.target = null
+
             val res = t.filter(tree)
-            if (res.isEmpty()) {
-                this.message = "can not find action node ${t.name}, controls:\n${tree.hierarchyString}"
+            if (res.isEmpty() && !t.optional) {
+                this.message = "can not find mandatory action node ${t.name}"
                 tree.recycle()
                 return false
             }
 
+            if (res.isEmpty()) continue
+
             res.first().also {
-                // recycle the previous target if existed
-                t.target?.tryRecycle()
                 t.target = tree.getAccessibilityNodeInfo(it)
                 tree.markKept(it)
             }
@@ -128,14 +144,10 @@ class AutomationStep @JvmOverloads constructor(val name: String, var automator: 
 
     // start the action-expect loop
     fun run(): Boolean {
-        if (automator == null) {
-            this.message = "run failed: null automator"
-            return false
-        }
-
         do {
             actionExecuted++
 
+            Log.v(TAG, "${automator.name}: run step $name for $actionExecuted times")
             if (!this.prepareAllActionTarget()) {
                 if (actionExecuted > retryCount) break else continue
             }
@@ -157,7 +169,7 @@ class AutomationStep @JvmOverloads constructor(val name: String, var automator: 
             }
 
             if (actionExecuted >= retryCount) {
-                message = "no matched expectation after tried $actionExecuted times\ncontrols:\n${tree.hierarchyString}"
+                message = "no matched expectation after tried $actionExecuted times"
                 tree.recycle()
                 break
             }
@@ -172,6 +184,9 @@ class AppAutomator(val srv: AccessibilityService, val name: String) {
 
     var allStepsSucceed = false
     var message: String? = null
+        private set
+
+    var failedHierachyString: String? = null
         private set
 
     val steps: MutableList<AutomationStep> = mutableListOf()
@@ -189,7 +204,7 @@ class AppAutomator(val srv: AccessibilityService, val name: String) {
         @JvmStatic
         var defaultPostActDelay: Long = 2000
         @JvmStatic
-        var defaultPreActDelay: Long = 1000
+        var defaultPreActDelay: Long = 0
     }
 
     fun stepOf(name: String): AutomationStep {
@@ -204,6 +219,7 @@ class AppAutomator(val srv: AccessibilityService, val name: String) {
             if (!step.run()) {
                 this.message = "run step ${step.name} failed: ${step.message}"
                 anyStepFail = true
+                failedHierachyString = srv.getHierarchyString()
                 break
             }
         }
@@ -231,7 +247,7 @@ class AppAutomator(val srv: AccessibilityService, val name: String) {
         val step = AutomationStep("step_open_app_$packageName", this)
         step.retry(0).postActionDelay(0).action {
             quitApp(srv, packageName)
-            openApp(srv, srv.applicationContext, packageName)
+            openApp(srv, packageName)
         }.expect { tree, _ ->
             tree.packageName == packageName
         }

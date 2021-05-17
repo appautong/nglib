@@ -15,7 +15,11 @@ fun bringFront(ctx: Context) {
     am.appTasks[0].moveToFront()
 }
 
-fun openApp(srv: AccessibilityService?, ctx: Context, packageName: String, timeoutMS: Long = 4000): Boolean {
+fun openApp(srv: AccessibilityService?, packageName: String, timeoutMS: Long = 4000): Boolean {
+    if (srv == null) return false
+
+    val ctx = srv.applicationContext
+
     var now = System.currentTimeMillis()
     val deadline = now + timeoutMS
     var interval = timeoutMS.shr(3)

@@ -143,7 +143,7 @@ class HierarchyTree private constructor() {
      *  descendant: A B
      *  child: A > B
      */
-    fun classNameSelector(selector: String): SelectionResult {
+    fun classHierarchySelector(selector: String): SelectionResult {
         if (selector.isBlank()) return listOf<HierarchyNode>().toSelectionResult()
 
         // convert selector string to parsed token list. e.g:

@@ -15,7 +15,7 @@ fun channelPageFollow(srv: AccessibilityService): JSONObject {
         ret["error"] = "setup hierarchy tree failed"
         return ret
     }
-    val hnode = ht.classNameSelector("${ClassName.Linearlayout}>${ClassName.FrameLayout}>${ClassName.TextView}").text("私信").firstOrNull()
+    val hnode = ht.classHierarchySelector("${ClassName.Linearlayout}>${ClassName.FrameLayout}>${ClassName.TextView}").text("私信").firstOrNull()
     if (hnode == null) {
         ret["error"] = "channelPageFollow: find 私信 control failed"
         ht.recycle()
@@ -82,7 +82,7 @@ fun channelPageGotoTrendVideo(srv: AccessibilityService, name: String, videoDesc
     }
 
     val ht = HierarchyTree.from(top)
-    val nodes = ht.classNameSelector("${ClassName.RecyclerView}>${ClassName.Linearlayout}>${ClassName.TextView}").selector {
+    val nodes = ht.classHierarchySelector("${ClassName.RecyclerView}>${ClassName.Linearlayout}>${ClassName.TextView}").selector {
         when {
             it.text.isNullOrEmpty() -> false
             else -> !it.text.toString().startsWith("#")
@@ -139,7 +139,7 @@ fun videoDetailLikeComment(srv: AccessibilityService, comment: String?, like: Bo
         return ret
     }
     val ht = HierarchyTree.from(top)
-    var hnodes = ht.classNameSelector("${ClassName.RecyclerView}>${ClassName.FrameLayout}>${ClassName.Linearlayout}>${ClassName.Linearlayout}>${ClassName.TextView}").isVisibleToUser()
+    var hnodes = ht.classHierarchySelector("${ClassName.RecyclerView}>${ClassName.FrameLayout}>${ClassName.Linearlayout}>${ClassName.Linearlayout}>${ClassName.TextView}").isVisibleToUser()
     if (hnodes.isEmpty()) {
         ht.recycle()
         ret["error"] = "can not find expected video action entries"

@@ -274,28 +274,28 @@ fun chatPageAddPeer(srv: AccessibilityService): JSONObject {
 
     var foundNotfiBar = false
     automator.stepOf("click top notification").setupActionNode("top_noti_bar") { tree ->
-        tree.classNameSelector("${ClassName.Linearlayout}>${ClassName.TextView}").text("对方还不是你的朋友").clickableParent()
+        tree.classHierarchySelector("${ClassName.Linearlayout}>${ClassName.TextView}").text("对方还不是你的朋友").clickableParent()
     }.action {
         foundNotfiBar = true
         it.getActionNodeInfo("top_noti_bar").click(null)
     }.expect { tree, _ ->
-        tree.classNameSelector("${ClassName.Linearlayout}>${ClassName.TextView}").text("添加到通讯录").clickableParent().isNotEmpty()
+        tree.classHierarchySelector("${ClassName.Linearlayout}>${ClassName.TextView}").text("添加到通讯录").clickableParent().isNotEmpty()
     }.postActionDelay(2000).retry(1)
 
     automator.stepOf("click add to contacts").setupActionNode("add_as_contact") { tree ->
-        tree.classNameSelector("${ClassName.Linearlayout}>${ClassName.TextView}").text("添加到通讯录").clickableParent()
+        tree.classHierarchySelector("${ClassName.Linearlayout}>${ClassName.TextView}").text("添加到通讯录").clickableParent()
     }.action {
         it.getActionNodeInfo("add_as_contact").click(null)
     }.expect { tree, _ ->
-        tree.classNameSelector("${ClassName.Linearlayout}>${ClassName.TextView}").text("发消息").clickableParent().isNotEmpty()
-    }.postActionDelay(2000)
+        tree.classHierarchySelector("${ClassName.Linearlayout}>${ClassName.TextView}").text("发消息").clickableParent().isNotEmpty()
+    }.postActionDelay(3000)
 
     automator.stepOf("click send message").setupActionNode("send_message"){tree ->
-        tree.classNameSelector("${ClassName.Linearlayout}>${ClassName.TextView}").text("发消息").clickableParent()
+        tree.classHierarchySelector("${ClassName.Linearlayout}>${ClassName.TextView}").text("发消息").clickableParent()
     }.action {
         it.getActionNodeInfo("send_message").click(null)
     }.expect { tree, _ ->
-        tree.classNameSelector("${ClassName.Linearlayout}>${ClassName.ImageButton}").contentDescription("更多功能按钮").firstOrNull() != null
+        tree.classHierarchySelector("${ClassName.Linearlayout}>${ClassName.ImageButton}").contentDescription("更多功能按钮").firstOrNull() != null
     }.postActionDelay(2000)
 
     automator.run()
