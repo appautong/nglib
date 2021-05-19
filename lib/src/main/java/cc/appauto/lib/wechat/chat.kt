@@ -282,10 +282,12 @@ fun chatPageAddPeer(srv: AccessibilityService): JSONObject {
         tree.classHierarchySelector("${ClassName.Linearlayout}>${ClassName.TextView}").text("添加到通讯录").clickableParent().isNotEmpty()
     }.postActionDelay(2000).retry(1)
 
-    automator.stepOf("click add to contacts").setupActionNode("add_as_contact") { tree ->
+    automator.stepOf("click add to contacts").setupOptionalActionNode("add_as_contact") { tree ->
         tree.classHierarchySelector("${ClassName.Linearlayout}>${ClassName.TextView}").text("添加到通讯录").clickableParent()
     }.action {
-        it.getActionNodeInfo("add_as_contact").click(null)
+        if (it.actionTargetIsFound("add_as_contact")) {
+            it.getActionNodeInfo("add_as_contact").click(null)
+        }
     }.expect { tree, _ ->
         tree.classHierarchySelector("${ClassName.Linearlayout}>${ClassName.TextView}").text("发消息").clickableParent().isNotEmpty()
     }.postActionDelay(3000)
