@@ -154,6 +154,7 @@ object AppAutoContext {
         val s = autoSrv ?: return
         executor.submitTask {
             HierarchyTree.from(s)?.let {
+                Log.i(TAG, "dump top active app, package: ${it.packageName} window: ${it.windowId}")
                 it.print()
                 it.recycle()
             }

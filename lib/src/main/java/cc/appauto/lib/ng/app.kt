@@ -15,7 +15,8 @@ fun bringFront(ctx: Context) {
     am.appTasks[0].moveToFront()
 }
 
-fun openApp(srv: AccessibilityService?, packageName: String, timeoutMS: Long = 4000): Boolean {
+@JvmOverloads
+fun openApp(srv: AccessibilityService?, packageName: String, isDualApp: Boolean=false, timeoutMS: Long = 4000): Boolean {
     if (srv == null) return false
 
     val ctx = srv.applicationContext
@@ -31,14 +32,49 @@ fun openApp(srv: AccessibilityService?, packageName: String, timeoutMS: Long = 4
 
     var top: AccessibilityNodeInfo?
     do {
-        top = getTopAppNode(srv, packageName)
+        top = getTopAppNode(srv)
+        var retryStartActivity = true
+
         if (top != null) {
-            top.recycle()
-            return true
+            if (top.packageName == packageName) {
+                top.recycle()
+                return true
+            }
+            // check whether there are dual app opening prompt
+            val tree = HierarchyTree.from(top)
+            var res = tree.classHierarchySelector("${ClassName.TextView}").text("请选择要使用的应用")
+            if (res.isNotEmpty()) {
+                retryStartActivity = false
+                res = tree.classHierarchySelector("${ClassName.Linearlayout} > ${ClassName.ImageView}")
+                if (res.size != 2) {
+                    Log.w(TAG, "unexpected number (${res.size} of app found in the app selection ui, expect number is 2")
+                    tree.recycle()
+                    return false
+                }
+
+                val node  = if (isDualApp) {
+                    res.contentDescription("双开").clickableParent().firstOrNull()
+                } else {
+                    res.selector {
+                        when {
+                            it.contentDescription == null -> false
+                            it.contentDescription!!.contains("双开") -> false
+                            else -> true
+                        }
+                    }.clickableParent().firstOrNull()
+                }
+
+                if (node != null) {
+                    tree.getAccessibilityNodeInfo(node)?.click(null)
+                } else {
+                    Log.w(TAG, "can not find app to be opened in app selection UI: $res")
+                }
+            }
+            tree.recycle()
         }
         sleep(interval)
         // retry open the app
-        ctx.startActivity(intent)
+        if (retryStartActivity) ctx.startActivity(intent)
         now = System.currentTimeMillis()
     } while (now < deadline)
     return false
