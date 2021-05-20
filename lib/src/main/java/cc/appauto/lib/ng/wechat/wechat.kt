@@ -43,7 +43,7 @@ object Wechat {
 
         if (!automator.allStepsSucceed) return ret.also {
             ret["error"] = automator.message
-            ret["hierarchy"] = automator.failedHierachyString
+            ret["hierarchy"] = automator.failedHierarchyString
         }
 
         return ret.also {
@@ -96,7 +96,7 @@ object Wechat {
 
         if (!automator.allStepsSucceed) return ret.also {
             ret["error"] = automator.message
-            ret["hierarchy"] = automator.failedHierachyString
+            ret["hierarchy"] = automator.failedHierarchyString
         }
 
         return ret.also {
@@ -157,7 +157,7 @@ object Wechat {
 
         if (!automator.allStepsSucceed) return ret.also {
             ret["error"] = automator.message
-            ret["hierarchy"] = automator.failedHierachyString
+            ret["hierarchy"] = automator.failedHierarchyString
         }
 
         return ret.also {

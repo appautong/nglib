@@ -153,7 +153,7 @@ interface HierarchyTree {
      *
      * e.g.: A > B C D > E F > G
      */
-    classNameSelector(selector: string): SelectionResult;
+    classHierarchySelector(selector: string): SelectionResult;
 }
 
 interface AutomationStep {
@@ -172,14 +172,19 @@ interface AutomationStep {
     // set the retry count; the action will be retired n-times if expect predicate not matched
     retry(n: number): AutomationStep;
 
-    // set the delay after executed the action
+    // set the delay after executed the action, default 2000ms
     postActionDelay(ms: number): AutomationStep;
+
+    // set the delay before checking all action target, default 0ms
+    preActionDelay(ms: number): AutomationStep;
 
     // setupActionNode add a constraint on given action node
     // all action nodes shall be ready before the action executed
     setupActionNode(name: string, filter:  (tree: HierarchyTree) => SelectionResult);
+    setupOptionalActionNode(name: string, filter:  (tree: HierarchyTree) => SelectionResult);
 
     getActionNodeInfo(name: string): any;
+    actionTargetIsFound(name: string): boolean;
 }
 
 interface Automator {
@@ -200,6 +205,8 @@ interface Automator {
 
     // descriptive message of the run result
     message: string;
+
+    failedHierarchyString: string;
 }
 
 

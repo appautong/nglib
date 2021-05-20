@@ -50,7 +50,7 @@ class AutomationStep constructor(val name: String, val automator: AppAutomator) 
     }
 
     // setupActionNode add a constraint on given action node
-    // later, isActionTargetFound can be used to test whether given action node is found
+    // later, actionTargetIsFound can be used to test whether given action node is found
     fun setupOptionalActionNode(name: String, filter: (tree: HierarchyTree) -> SelectionResult): AutomationStep    {
         val elem = ActionTarget(name, filter)
         elem.optional = true
@@ -186,7 +186,7 @@ class AppAutomator(val srv: AccessibilityService, val name: String) {
     var message: String? = null
         private set
 
-    var failedHierachyString: String? = null
+    var failedHierarchyString: String? = null
         private set
 
     val steps: MutableList<AutomationStep> = mutableListOf()
@@ -219,7 +219,7 @@ class AppAutomator(val srv: AccessibilityService, val name: String) {
             if (!step.run()) {
                 this.message = "run step ${step.name} failed: ${step.message}"
                 anyStepFail = true
-                failedHierachyString = srv.getHierarchyString()
+                failedHierarchyString = srv.getHierarchyString()
                 break
             }
         }
