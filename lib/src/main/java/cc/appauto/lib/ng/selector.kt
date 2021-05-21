@@ -27,6 +27,11 @@ class SelectionResult(val nodes: List<HierarchyNode>): Collection<HierarchyNode>
         return filter { it.parent != null }.map { it.parent!! }.toSelectionResult()
     }
 
+    // return nth sibling
+    fun sibling(n: Int): SelectionResult {
+        return filter { it.siblingIndex + n <= it.siblings.size }.map { it.sibling(n)!! }.toSelectionResult()
+    }
+
     @JvmOverloads
     fun text(value: String, exactlyMatch: Boolean = false): SelectionResult {
         return filter { contentCompare(it.text, value, exactlyMatch)}.toSelectionResult()

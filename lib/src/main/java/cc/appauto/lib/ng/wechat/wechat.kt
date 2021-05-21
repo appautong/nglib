@@ -16,14 +16,7 @@ object Wechat {
             ret["error"] = "create automator failed"
         }
 
-        automator.stepOf("open_wechat_home").action {
-            quitApp(automator.srv, WechatPackageName)
-            openApp(automator.srv, WechatPackageName)
-        }.expect { tree, _ ->
-            tree.classHierarchySelector("${ClassName.RelativeLayout}>${ClassName.TextView}").selector {
-                bottomLables.contains(it.text)
-            }.size >= bottomLables.size
-        }.postActionDelay(0)
+        automator.stepOfOpenWechatHome()
 
         val contactLables = setOf("新的朋友", "通讯录")
         automator.stepOf("goto_contact_page").setupActionNode("contact") { tree ->
@@ -35,7 +28,7 @@ object Wechat {
             tree.classHierarchySelector("${ClassName.Linearlayout}>${ClassName.TextView}").selector {
                 contactLables.contains(it.text)
             }.size >= contactLables.size
-        }.preActionDelay(0)
+        }
 
         automator.run()
         Log.i(TAG, "openContactPage: ${automator.allStepsSucceed}, message: ${automator.message}")
@@ -70,7 +63,7 @@ object Wechat {
                     .text("朋友圈").isEmpty() -> false
                 else -> true
             }
-        }.preActionDelay(0).postActionDelay(2000)
+        }.postActionDelay(2000)
 
         automator.stepOf("search_user").setupActionNode("input") { tree ->
             tree.classHierarchySelector("${ClassName.EditText}").text("搜索")
@@ -80,7 +73,7 @@ object Wechat {
             val node = step.getActionNodeInfo("input")
             node.refresh()
             node.text.toString() == user
-        }.preActionDelay(0)
+        }
 
         automator.stepOf("click_user_entry").setupActionNode("user") {
             it.classHierarchySelector("${ClassName.ListView}>${ClassName.RelativeLayout}>${ClassName.TextView}").text(user, true).clickableParent()
@@ -163,5 +156,85 @@ object Wechat {
         return ret.also {
             ret["result"] = "success"
         }
+    }
+
+    fun AppAutomator.stepOfOpenWechatHome() {
+        this.stepOf("open_wechat_home").action {
+            quitApp(this.srv, WechatPackageName)
+            openApp(this.srv, WechatPackageName)
+        }.expect { tree, _ ->
+            tree.classHierarchySelector("${ClassName.RelativeLayout}>${ClassName.TextView}").selector {
+                bottomLables.contains(it.text)
+            }.size >= bottomLables.size
+        }.postActionDelay(0)
+    }
+
+    @JvmStatic
+    fun openMePage(): JSONObject {
+        val ret = JSONObject()
+
+        val automator = AppAutoContext.automatorOf(::openMePage.name) ?: return ret.also {
+            ret["error"] = "create automator failed"
+        }
+
+        automator.stepOfOpenWechatHome()
+
+        automator.stepOf("open_me_page").setupActionNode("me") { tree ->
+            tree.classHierarchySelector("${ClassName.RelativeLayout}>${ClassName.TextView}").text("我")
+                .clickableParent()
+        }.action {
+            it.getActionNodeInfo("me").click(null)
+        }.expect { tree, _ ->
+            tree.classHierarchySelector("${ClassName.Linearlayout} > ${ClassName.TextView}").selector {
+                (it.text != null) && (it.text == "设置" || it.text!!.contains("微信号"))
+            }.size >= 2
+        }
+
+        automator.stepOf("open_personal_info_page").setupActionNode("info") {
+            val info = it.classHierarchySelector("${ClassName.Linearlayout} > ${ClassName.TextView}").text("微信号")
+            if (info.isNotEmpty()) ret["wxid"] = info.first().text!!.split("：").last()
+            info
+        }.action {
+            it.getActionNodeInfo("info").click(null)
+        }.expect { tree, _ ->
+            tree.classHierarchySelector("${ClassName.TextView}").text("个人信息").isNotEmpty()
+        }
+
+        automator.stepOf("extract_basic_info").setupActionNode("alias") {
+            it.classHierarchySelector("${ClassName.Linearlayout} > ${ClassName.TextView}").text("昵称").sibling(1)
+        }.setupActionNode("wxid") {
+            it.classHierarchySelector("${ClassName.Linearlayout} > ${ClassName.TextView}").text("微信号").sibling(1)
+        }.setupActionNode("more") {
+            it.classHierarchySelector("${ClassName.Linearlayout} > ${ClassName.TextView}").text("更多").clickableParent()
+        }.action {
+            ret["alias"] = it.getActionNodeInfo("alias").text.toString()
+            ret["wxid"] = it.getActionNodeInfo("wxid").text.toString()
+            it.getActionNodeInfo("more").click(null)
+        }.expect { tree, _ ->
+            tree.classHierarchySelector("${ClassName.TextView}").text("更多信息").isNotEmpty()
+        }
+
+        automator.stepOf("extract_more_info").setupActionNode("gender") {
+            it.classHierarchySelector("${ClassName.Linearlayout} > ${ClassName.TextView}").text("性别").sibling(1)
+        }.setupActionNode("region") {
+            it.classHierarchySelector("${ClassName.Linearlayout} > ${ClassName.TextView}").text("地区").sibling(1)
+        }.setupActionNode("signature") {
+            it.classHierarchySelector("${ClassName.Linearlayout} > ${ClassName.TextView}").text("性签名").sibling(1)
+        }.action {
+            ret["gender"] = it.getActionNodeInfo("gender").text.toString()
+            ret["region"] = it.getActionNodeInfo("region").text.toString()
+            ret["signature"] = it.getActionNodeInfo("signature").text.toString()
+        }.postActionDelay(500).expect { _, _ -> true }
+
+        automator.run()
+        Log.i(TAG, "openMePage: ${automator.allStepsSucceed}, message: ${automator.message}, ret: ${ret.toJSONString()}")
+        automator.close()
+
+        if (!automator.allStepsSucceed) return ret.also {
+            ret["error"] = automator.message
+            ret["hierarchy"] = automator.failedHierarchyString
+        }
+
+        return ret
     }
 }

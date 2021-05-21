@@ -134,6 +134,7 @@ class AutomationStep constructor(val name: String, val automator: AppAutomator) 
             if (res.isEmpty()) continue
 
             res.first().also {
+                Log.d(TAG, "found action target: ${t.name}, optional: ${t.optional}, ${it.string}")
                 t.target = tree.getAccessibilityNodeInfo(it)
                 tree.markKept(it)
             }
@@ -154,7 +155,7 @@ class AutomationStep constructor(val name: String, val automator: AppAutomator) 
             this.act(this)
             sleep(postActDelay)
 
-            val tree = HierarchyTree.from(automator!!.srv)
+            val tree = HierarchyTree.from(automator.srv)
             if (tree == null) {
                 message = "null hierarchy tree in NO.$actionExecuted execution"
                 if (actionExecuted > retryCount) break else continue
