@@ -9,14 +9,15 @@ object Wechat {
     private val bottomLables = setOf("微信", "通讯录", "发现", "我")
 
     @JvmStatic
-    fun openContactPage(): JSONObject {
+    @JvmOverloads
+    fun openContactPage(isDualApp: Boolean=false): JSONObject {
         val ret = JSONObject()
 
         val automator = AppAutoContext.automatorOf(::openContactPage.name) ?: return ret.also {
             ret["error"] = "create automator failed"
         }
 
-        automator.stepOfOpenWechatHome()
+        automator.stepOfOpenWechatHome(isDualApp)
 
         val contactLables = setOf("新的朋友", "通讯录")
         automator.stepOf("goto_contact_page").setupActionNode("contact") { tree ->
@@ -158,10 +159,11 @@ object Wechat {
         }
     }
 
-    fun AppAutomator.stepOfOpenWechatHome() {
+    @JvmOverloads
+    fun AppAutomator.stepOfOpenWechatHome(isDualApp: Boolean = false) {
         this.stepOf("open_wechat_home").action {
             quitApp(this.srv, WechatPackageName)
-            openApp(this.srv, WechatPackageName)
+            openApp(this.srv, WechatPackageName, isDualApp)
         }.expect { tree, _ ->
             tree.classHierarchySelector("${ClassName.RelativeLayout}>${ClassName.TextView}").selector {
                 bottomLables.contains(it.text)
