@@ -4,6 +4,7 @@ import android.accessibilityservice.AccessibilityService
 import android.util.Log
 import android.view.accessibility.AccessibilityNodeInfo
 import cc.appauto.lib.tryRecycle
+import com.alibaba.fastjson.JSON
 import com.alibaba.fastjson.JSONObject
 
 private val DUMMY_ACTION = fun(_: AutomationStep) {}
@@ -256,11 +257,15 @@ class AppAutomator(val srv: AccessibilityService, val name: String) {
         return step
     }
 
-    val result
-        get() = JSONObject().also {
+    fun resultOf(data: JSONObject?): JSONObject {
+        return JSONObject().also {
             if (!allStepsSucceed) {
                 it["error"] = message
                 it["hierarchy"] = failedHierarchyString
-            } else it["result"] = "success"
+            } else it["result"] = data ?: "success"
         }
+    }
+
+    val result
+        get() = resultOf(null)
 }

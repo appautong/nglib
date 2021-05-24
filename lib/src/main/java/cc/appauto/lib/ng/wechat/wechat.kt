@@ -189,15 +189,15 @@ object Wechat {
             tree.classHierarchySelector("${ClassName.TextView}").text("更多信息").isNotEmpty()
         }
 
-        automator.stepOf("extract_more_info").setupActionNode("gender") {
+        automator.stepOf("extract_more_info").setupOptionalActionNode("gender") {
             it.classHierarchySelector("${ClassName.Linearlayout} > ${ClassName.TextView}").text("性别").sibling(1)
-        }.setupActionNode("region") {
+        }.setupOptionalActionNode("region") {
             it.classHierarchySelector("${ClassName.Linearlayout} > ${ClassName.TextView}").text("地区").sibling(1)
         }.setupActionNode("signature") {
             it.classHierarchySelector("${ClassName.Linearlayout} > ${ClassName.TextView}").text("性签名").sibling(1)
         }.action {
-            ret["gender"] = it.getActionNodeInfo("gender").text.toString()
-            ret["region"] = it.getActionNodeInfo("region").text.toString()
+            if (it.actionTargetIsFound("gender")) ret["gender"] = it.getActionNodeInfo("gender").text.toString()
+            if (it.actionTargetIsFound("region")) ret["region"] = it.getActionNodeInfo("region").text.toString()
             ret["signature"] = it.getActionNodeInfo("signature").text.toString()
         }.postActionDelay(500).expect { _, _ -> true }
 
@@ -205,18 +205,19 @@ object Wechat {
         Log.i(TAG, "mePageGetProfileInfo: ${automator.allStepsSucceed}, message: ${automator.message}, ret: ${ret.toJSONString()}")
         automator.close()
 
-        return automator.result
+        return automator.resultOf(ret)
     }
 
     @JvmStatic
-    fun openMePage(): JSONObject {
+    @JvmOverloads
+    fun openMePage(isDualApp: Boolean = false): JSONObject {
         val ret = JSONObject()
 
         val automator = AppAutoContext.automatorOf(::openMePage.name) ?: return ret.also {
             ret["error"] = "create automator failed"
         }
 
-        automator.stepOfOpenWechatHome()
+        automator.stepOfOpenWechatHome(isDualApp)
 
         automator.stepOf("open_me_page").setupActionNode("me") { tree ->
             tree.classHierarchySelector("${ClassName.RelativeLayout}>${ClassName.TextView}").text("我")

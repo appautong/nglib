@@ -73,6 +73,12 @@ class ExampleUnitTest {
     }
 
     @Test
+    fun testFilter() {
+        val arr = listOf(1, 2, 3, 4)
+        println(arr.filter { it > 5 }.map { it * it })
+    }
+
+    @Test
     fun testSelectorParse() {
         val selector = "A  >  B  C >  D E >  F > G"
         val tmp = selector.split(">")

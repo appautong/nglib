@@ -1,5 +1,7 @@
 package cc.appauto.lib.ng
 
+import android.util.Log
+
 internal fun List<HierarchyNode>.toSelectionResult(): SelectionResult {
     return SelectionResult(this)
 }
@@ -29,7 +31,8 @@ class SelectionResult(val nodes: List<HierarchyNode>): Collection<HierarchyNode>
 
     // return nth sibling
     fun sibling(n: Int): SelectionResult {
-        return filter { it.siblingIndex + n <= it.siblings.size }.map { it.sibling(n)!! }.toSelectionResult()
+        val res =  filter { it.siblingIndex + n < it.siblings.size }.map { it.sibling(n)!! }.toSelectionResult()
+        return res
     }
 
     @JvmOverloads
