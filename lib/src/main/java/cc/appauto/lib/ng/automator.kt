@@ -255,4 +255,12 @@ class AppAutomator(val srv: AccessibilityService, val name: String) {
         steps.add(step)
         return step
     }
+
+    val result
+        get() = JSONObject().also {
+            if (!allStepsSucceed) {
+                it["error"] = message
+                it["hierarchy"] = failedHierarchyString
+            } else it["result"] = "success"
+        }
 }

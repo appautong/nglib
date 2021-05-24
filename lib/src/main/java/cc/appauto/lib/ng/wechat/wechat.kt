@@ -88,14 +88,7 @@ object Wechat {
         Log.i(TAG, "contactPageOpenUser: ${automator.allStepsSucceed}, message: ${automator.message}")
         automator.close()
 
-        if (!automator.allStepsSucceed) return ret.also {
-            ret["error"] = automator.message
-            ret["hierarchy"] = automator.failedHierarchyString
-        }
-
-        return ret.also {
-            ret["result"] = "success"
-        }
+        return automator.result
     }
 
     @JvmStatic
@@ -149,14 +142,7 @@ object Wechat {
         Log.i(TAG, "chatPageSendText: ${automator.allStepsSucceed}, message: ${automator.message}")
         automator.close()
 
-        if (!automator.allStepsSucceed) return ret.also {
-            ret["error"] = automator.message
-            ret["hierarchy"] = automator.failedHierarchyString
-        }
-
-        return ret.also {
-            ret["result"] = "success"
-        }
+        return automator.result
     }
 
     @JvmOverloads
@@ -172,24 +158,11 @@ object Wechat {
     }
 
     @JvmStatic
-    fun openMePage(): JSONObject {
+    fun mePageGetProfileInfo(): JSONObject {
         val ret = JSONObject()
 
-        val automator = AppAutoContext.automatorOf(::openMePage.name) ?: return ret.also {
+        val automator = AppAutoContext.automatorOf(::mePageGetProfileInfo.name) ?: return ret.also {
             ret["error"] = "create automator failed"
-        }
-
-        automator.stepOfOpenWechatHome()
-
-        automator.stepOf("open_me_page").setupActionNode("me") { tree ->
-            tree.classHierarchySelector("${ClassName.RelativeLayout}>${ClassName.TextView}").text("我")
-                .clickableParent()
-        }.action {
-            it.getActionNodeInfo("me").click(null)
-        }.expect { tree, _ ->
-            tree.classHierarchySelector("${ClassName.Linearlayout} > ${ClassName.TextView}").selector {
-                (it.text != null) && (it.text == "设置" || it.text!!.contains("微信号"))
-            }.size >= 2
         }
 
         automator.stepOf("open_personal_info_page").setupActionNode("info") {
@@ -229,14 +202,38 @@ object Wechat {
         }.postActionDelay(500).expect { _, _ -> true }
 
         automator.run()
-        Log.i(TAG, "openMePage: ${automator.allStepsSucceed}, message: ${automator.message}, ret: ${ret.toJSONString()}")
+        Log.i(TAG, "mePageGetProfileInfo: ${automator.allStepsSucceed}, message: ${automator.message}, ret: ${ret.toJSONString()}")
         automator.close()
 
-        if (!automator.allStepsSucceed) return ret.also {
-            ret["error"] = automator.message
-            ret["hierarchy"] = automator.failedHierarchyString
+        return automator.result
+    }
+
+    @JvmStatic
+    fun openMePage(): JSONObject {
+        val ret = JSONObject()
+
+        val automator = AppAutoContext.automatorOf(::openMePage.name) ?: return ret.also {
+            ret["error"] = "create automator failed"
         }
 
-        return ret
+        automator.stepOfOpenWechatHome()
+
+        automator.stepOf("open_me_page").setupActionNode("me") { tree ->
+            tree.classHierarchySelector("${ClassName.RelativeLayout}>${ClassName.TextView}").text("我")
+                .clickableParent()
+        }.action {
+            it.getActionNodeInfo("me").click(null)
+        }.expect { tree, _ ->
+            tree.classHierarchySelector("${ClassName.Linearlayout} > ${ClassName.TextView}").selector {
+                (it.text != null) && (it.text == "设置" || it.text!!.contains("微信号"))
+            }.size >= 2
+        }
+
+
+        automator.run()
+        Log.i(TAG, "openMePage: ${automator.allStepsSucceed}, message: ${automator.message}")
+        automator.close()
+
+        return automator.result
     }
 }
