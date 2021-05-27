@@ -1,14 +1,19 @@
 package cc.appauto.lib.ng
 
 import android.accessibilityservice.AccessibilityService
+import android.app.Activity
 import android.app.ActivityManager
+import android.app.AlertDialog
 import android.content.Context
+import android.content.Intent
 import android.graphics.Point
 import android.graphics.Rect
+import android.provider.Settings
 import android.util.Log
 import android.view.WindowManager
 import android.view.accessibility.AccessibilityNodeInfo
 import android.view.accessibility.AccessibilityWindowInfo
+import cc.appauto.lib.R
 
 fun bringFront(ctx: Context) {
     val am = ctx.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
@@ -133,4 +138,25 @@ fun getAppBound(srv: AccessibilityService?): Rect? {
     cachedAppWinRect = ret
 
     return ret
+}
+
+/***
+ * ctx: if ctx is not activity instance, showConfirmDialog param is useless and
+ * confirm dialogue can not be showed.
+ */
+@JvmOverloads
+fun openSetting(ctx: Context, action: String, showConfirmDialog: Boolean = false, confirmMessage: String) {
+    val intent = Intent(action)
+    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    if (!(ctx is Activity && showConfirmDialog)) {
+        AppAutoContext.appContext.startActivity(intent)
+        return
+    }
+    val builder = AlertDialog.Builder(ctx)
+    builder.setTitle(R.string.appauto_require_permission)
+        .setMessage(confirmMessage)
+        .setIcon(android.R.drawable.ic_dialog_alert)
+        .setPositiveButton(android.R.string.ok) { _, _ -> ctx.startActivity(intent) }
+        .setNegativeButton(android.R.string.cancel) { _,_ -> /* no-op */}
+        .show()
 }

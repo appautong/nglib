@@ -11,4 +11,5 @@
     <string name="appauto_media_service_notification_title">屏幕录制</string>
     <string name="appauto_media_service_notification_content">屏幕录制中...</string>
     <string name="appauto_media_service_default_notification_channel_name">autong媒体服务默认通知通道</string>
+    <string name="appauto_require_notification_permission">需要通知权限</string>
 </resources>

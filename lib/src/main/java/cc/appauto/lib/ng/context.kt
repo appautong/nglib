@@ -189,35 +189,18 @@ object AppAutoContext {
         return AppAutomator(s, name)
     }
 
-    fun openOverlayPermissionSetting(ctx: Context) {
-        val intent = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION)
-        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        if (ctx !is Activity) {
-            appContext.startActivity(intent)
-            return
-        }
-        val builder = AlertDialog.Builder(ctx)
-        builder.setTitle(R.string.appauto_require_permission)
-                .setMessage(R.string.appauto_require_overlay_permission)
-                .setIcon(android.R.drawable.ic_dialog_alert)
-                .setPositiveButton(android.R.string.ok) { _, _ -> ctx.startActivity(intent) }
-                .setNegativeButton(android.R.string.cancel) { _,_ -> /* no-op */}
-                .show()
+    @JvmStatic
+    fun openNotificationSetting(ctx: Context) {
+        return openSetting(ctx, Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS, true, ctx.resources.getString(R.string.appauto_require_notification_permission))
     }
 
+    @JvmStatic
+    fun openOverlayPermissionSetting(ctx: Context) {
+        return openSetting(ctx, Settings.ACTION_MANAGE_OVERLAY_PERMISSION, true, ctx.resources.getString(R.string.appauto_require_overlay_permission))
+    }
+
+    @JvmStatic
     fun openAccessibilitySetting(ctx: Context) {
-        val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
-        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        if (ctx !is Activity) {
-            ctx.startActivity(intent)
-            return
-        }
-        val builder = AlertDialog.Builder(ctx)
-        builder.setTitle(R.string.appauto_require_permission)
-                .setMessage(R.string.appauto_require_accessibility_permission)
-                .setIcon(android.R.drawable.ic_dialog_alert)
-                .setPositiveButton(android.R.string.ok) { _, _ -> ctx.startActivity(intent) }
-                .setNegativeButton(android.R.string.cancel) { _,_ -> /* no-op */}
-                .show()
+        return openSetting(ctx, Settings.ACTION_ACCESSIBILITY_SETTINGS, true, ctx.resources.getString(R.string.appauto_require_accessibility_permission))
     }
 }
