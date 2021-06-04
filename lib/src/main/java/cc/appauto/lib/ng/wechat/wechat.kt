@@ -19,7 +19,7 @@ object Wechat {
 
         automator.stepOfOpenWechatHome(isDualApp)
 
-        val contactLables = setOf("新的朋友", "通讯录")
+        val contactLables = setOf("新的朋友", "群聊")
         automator.stepOf("goto_contact_page").setupActionNode("contact") { tree ->
             tree.classHierarchySelector("${ClassName.RelativeLayout}>${ClassName.TextView}").text("通讯录")
                 .clickableParent()

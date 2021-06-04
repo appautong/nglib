@@ -210,7 +210,7 @@ object MediaRuntime {
         lastImageSaveMs = ms
         if (lastImageSaveTs == ts) replaceLast = true else lastImageSaveTs = ts
 
-        Log.i(TAG, "$name: save image at $ms, replace: $replaceLast")
+        Log.v(TAG, "$name: save image at $ms, replace: $replaceLast")
 
         val plane = image.planes[0]
         val width = plane.rowStride/plane.pixelStride
